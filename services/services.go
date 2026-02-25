@@ -16,8 +16,12 @@ type App interface {
 	GetDatastore() *models.DataStore
 }
 
-func NewServices(app App) *Services {
+func NewServices(app App) (*Services, error) {
 	services := &Services{}
-	services.AuthenticationService = auth.NewAuthenticationService(app)
-	return services
+	var err error
+	services.AuthenticationService, err = auth.NewAuthenticationService(app)
+	if err != nil {
+		return nil, err
+	}
+	return services, nil
 }

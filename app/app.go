@@ -1,6 +1,7 @@
 package app
 
 import (
+	"os"
 	"sync-board/handlers/auth"
 	"sync-board/handlers/front"
 	"sync-board/models"
@@ -13,6 +14,7 @@ type App struct {
 	router    *gin.Engine
 	services  *services.Services
 	datastore *models.DataStore
+	host      string
 }
 
 func NewApp() (*App, error) {
@@ -23,7 +25,11 @@ func NewApp() (*App, error) {
 	if app.datastore, err = models.NewDataStore(); err != nil {
 		return nil, err
 	}
-	app.services = services.NewServices(app)
+	app.host = os.Getenv("HOST")
+	app.services, err = services.NewServices(app)
+	if err != nil {
+		return nil, err
+	}
 	app.RegisterHandlers()
 	return app, nil
 }
@@ -45,6 +51,10 @@ func (app *App) GetDatastore() *models.DataStore {
 	return app.datastore
 }
 
+func (app *App) GetHost() string {
+	return app.host
+}
+
 func (app *App) Run() {
-	app.router.Run("127.0.0.1:8000")
+	app.router.Run(app.host)
 }

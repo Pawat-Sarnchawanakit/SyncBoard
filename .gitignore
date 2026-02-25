@@ -1,3 +1,4 @@
 proposal.md
 *.exe
 *.db
+.env

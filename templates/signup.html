@@ -218,8 +218,10 @@ body {
                 window.btn.disabled = false;
                 window.btn.innerText = orig_text;
                 let errmsg = x["error"];
-                if(!errmsg)
+                if(!errmsg) {
+                    location.reload()
                     return; 
+                }
                 if(errmsg.indexOf("UNIQUE constraint failed") != -1)
                     errmsg = "User already exists"
                 window.msg.innerText = errmsg;

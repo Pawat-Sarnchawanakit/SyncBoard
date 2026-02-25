@@ -214,7 +214,18 @@ body {
             </ul>
         </nav>
         <div class="auth-buttons">
+            {{if .Authenticated}}
+            <button onclick="logout()" class="login-btn">Logout</button>
+            <script>
+                function logout() {
+                    fetch("/api/logout", {
+                        method: "POST"
+                    }).then(x => location.reload());
+                }
+            </script>
+            {{else}}
             <a href="/login"><button class="login-btn">Login</button></a>
+            {{end}}
         </div>
     </header>
 

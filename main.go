@@ -3,6 +3,8 @@ package main
 import (
 	"log"
 	"sync-board/app"
+
+	"github.com/joho/godotenv"
 )
 
 // Views
@@ -13,6 +15,10 @@ import (
 // Board page (view/edit boards)
 
 func main() {
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal(err)
+	}
 	app, err := app.NewApp()
 	if err != nil {
 		log.Fatal(err)
