@@ -1,6 +1,9 @@
 package main
 
-import "sync-board/app"
+import (
+	"log"
+	"sync-board/app"
+)
 
 // Views
 // Sign Up
@@ -10,6 +13,9 @@ import "sync-board/app"
 // Board page (view/edit boards)
 
 func main() {
-  app := app.NewApp()
-  app.Run()  
+	app, err := app.NewApp()
+	if err != nil {
+		log.Fatal(err)
+	}
+	app.Run()
 }

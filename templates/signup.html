@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign Up - SyncBoard</title>
+<style>
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background-color: #f9fafb;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+}
+
+/* Container styles */
+.container {
+    background-color: #ffffff;
+    border-radius: 0.75rem;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    padding: 2rem;
+    max-width: 28rem;
+    width: 100%;
+}
+
+/* Header styles */
+.header {
+    text-align: center;
+    margin-bottom: 1.5rem;
+}
+
+.header h1 {
+    font-size: 1.875rem;
+    font-weight: 700;
+    color: #111827;
+}
+
+.header p {
+    color: #6b7280;
+    margin-top: 0.5rem;
+}
+
+/* Form styles */
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-group label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #374151;
+    margin-bottom: 0.25rem;
+}
+
+.form-control {
+    width: 100%;
+    padding: 0.5rem 1rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.5rem;
+    transition: all 0.2s ease;
+    font-size: 1rem;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 0.25rem rgba(59, 130, 246, 0.25);
+}
+
+/* Button styles */
+.btn {
+    width: 100%;
+    background-color: #3b82f6;
+    color: #ffffff;
+    font-weight: 500;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    transition: all 0.3s ease;
+    font-size: 1rem;
+    cursor: pointer;
+}
+
+.btn:hover {
+    background-color: #2563eb;
+}
+
+.btn[disabled] {
+    background-color: #6b7280;
+}
+
+/* Link styles */
+.link {
+    color: #3b82f6;
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.3s ease;
+}
+
+.link:hover {
+    color: #1d4ed8;
+}
+
+/* Footer styles */
+.footer {
+    margin-top: 1.5rem;
+    text-align: center;
+}
+
+.footer p {
+    color: #6b7280;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .container {
+        padding: 1.5rem;
+        max-width: 90%;
+    }
+    
+    .header h1 {
+        font-size: 1.5rem;
+    }
+}
+
+</style>
+    <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+    <script src="https://unpkg.com/feather-icons"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Create Account</h1>
+            <p>Join SyncBoard for real-time collaboration</p>
+        </div>
+        
+        <form id="signup-form" class="space-y-6">
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input 
+                    maxlength="128"
+                    type="text" 
+                    id="username" 
+                    name="username" 
+                    required 
+                    class="form-control"
+                    placeholder="Enter your username"
+                >
+            </div>
+            
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input 
+                    maxlength="128"
+                    type="password" 
+                    id="password" 
+                    name="password" 
+                    required 
+                    class="form-control"
+                    placeholder="Enter your password"
+                >
+            </div>
+            <p id="msg" style="color: #f00; padding-bottom: 10px;text-align: center;"></p>
+            <button id="btn" type="button" class="btn">
+                Sign Up
+            </button>
+        </form>
+        
+        <div class="footer">
+            <p>
+                Already have an account? 
+                <a href="/login" class="link">
+                    Log in here
+                </a>
+            </p>
+        </div>
+    </div>
+
+    <script>
+        let fields_ok = false;
+        function checkInputs() {
+            let msgs = [];
+            if(window.username.value.length < 3)
+                msgs.push("Username too short");
+            if(window.password.value.length < 8)
+                msgs.push("Password too short");
+            fields_ok = msgs.length == 0;
+            window.msg.innerText = msgs.join("\n");
+        }
+        window.password.onchange = checkInputs;
+        window.username.onchange = checkInputs;
+        window.btn.onclick = () => {
+            checkInputs();
+            if(!fields_ok)
+                return;
+            window.btn.disabled = true;
+            const orig_text = window.btn.innerText;
+            window.btn.innerText = "Please Wait...";
+            fetch("/api/signup", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    username: window.username.value,
+                    password: window.password.value
+                })
+            }).then(x => x.json())
+            .then(x => {
+                window.btn.disabled = false;
+                window.btn.innerText = orig_text;
+                let errmsg = x["error"];
+                if(!errmsg)
+                    return; 
+                if(errmsg.indexOf("UNIQUE constraint failed") != -1)
+                    errmsg = "User already exists"
+                window.msg.innerText = errmsg;
+            }).catch(err => {
+                window.msg.innerText = err;
+                window.btn.disabled = false;
+                window.btn.innerText = orig_text;
+            })
+        }
+    </script>
+
+    <script>feather.replace();</script>
+</body>
+</html>

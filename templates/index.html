@@ -1,395 +1,251 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>White board</title>
-  <style>
-    :root {
-      --toolbar-h: 110px;
-    }
-    * { box-sizing: border-box; }
-    html, body { height: 100%; margin: 0; padding: 0; background: #fff; }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SyncBoard - Realtime Whiteboard</title>
+<style>
+    /* Reset and base styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
 
-    
-    .board {
-      position: relative;
-      width: 100vw;
-      height: 100vh;
-      overflow: hidden;
-      background: #fff;
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f8f9fa;
+    color: #333;
+    line-height: 1.6;
+}
+
+/* Header styles */
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 2rem;
+    background-color: #ffffff;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.logo h1 {
+    color: #007bff;
+    font-size: 1.5rem;
+    font-weight: 700;
+}
+
+.nav ul {
+    display: flex;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.nav ul li {
+    margin: 0 1rem;
+}
+
+.nav ul li a {
+    text-decoration: none;
+    color: #333;
+    font-weight: 500;
+    transition: color 0.3s ease;
+}
+
+.nav ul li a:hover {
+    color: #007bff;
+}
+
+.login-btn {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: background-color 0.3s ease;
+}
+
+.login-btn:hover {
+    background-color: #0056b3;
+}
+
+/* Main content */
+.main-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+/* Hero section */
+.hero {
+    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+    border-radius: 8px;
+    padding: 3rem 2rem;
+    color: white;
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.hero h2 {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+}
+
+.hero p {
+    font-size: 1.2rem;
+    margin-bottom: 2rem;
+    opacity: 0.9;
+}
+
+.cta-button {
+    background-color: #ffffff;
+    color: #007bff;
+    border: none;
+    padding: 0.8rem 1.5rem;
+    border-radius: 4px;
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.cta-button:hover {
+    background-color: #e9ecef;
+}
+
+/* Features section */
+.features {
+    display: flex;
+    justify-content: space-around;
+    flex-wrap: wrap;
+    gap: 2rem;
+    margin-top: 2rem;
+}
+
+.feature {
+    text-align: center;
+    padding: 1rem;
+    flex: 1;
+    min-width: 200px;
+    max-width: 300px;
+    background: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    transition: transform 0.3s ease;
+}
+
+.feature:hover {
+    transform: translateY(-5px);
+}
+
+.feature h3 {
+    color: #007bff;
+    margin-bottom: 0.5rem;
+}
+
+.feature p {
+    color: #666;
+    font-size: 0.9rem;
+}
+
+/* Footer styles */
+.footer {
+    background-color: #ffffff;
+    padding: 1rem 2rem;
+    text-align: center;
+    border-top: 1px solid #e9ecef;
+    margin-top: 2rem;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .header {
+        flex-direction: column;
+        padding: 1rem;
     }
 
-    
-    #boardCanvas {
-      position: absolute;
-      left: 0;
-      top: 0;
-      width: 100%;
-      height: 100%;
-      display: block;
-      
+    .nav ul {
+        margin-top: 1rem;
+        flex-wrap: wrap;
+        justify-content: center;
     }
 
-    
-    .toolbar {
-      position: fixed;
-      left: 0; right: 0; bottom: 0;
-      height: var(--toolbar-h);
-      background: rgba(255, 255, 255, 0.98);
-      border-top: 1px solid #eee;
-      display: flex;
-      align-items: center;
-      padding: 12px 14px;
-      gap: 12px;
-      box-shadow: 0 -2px 6px rgba(0,0,0,.04);
-      z-index: 10;
-      flex-wrap: wrap;
+    .nav ul li {
+        margin: 0.5rem;
     }
 
-    
-    .tool-btn {
-      padding: 8px 12px;
-      border: 1px solid #ddd;
-      background: #fff;
-      border-radius: 8px;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      font-family: inherit;
-      font-size: 14px;
-    }
-    .tool-btn.active {
-      background: #f0f0f8;
-      border-color: #aaa;
+    .hero {
+        padding: 2rem 1rem;
     }
 
-    .spacer { flex: 1 1 auto; }
-
-    
-    .color-palette { display: flex; align-items: center; gap: 6px; }
-    .swatch {
-      width: 28px; height: 28px; border-radius: 6px;
-      border: 2px solid #fff;
-      box-shadow: 0 1px 2px rgba(0,0,0,.15);
-      cursor: pointer;
-      outline: none;
-    }
-    .swatch.selected { border: 2px solid #333; }
-
-    
-    .size-selector { display: flex; align-items: center; gap: 6px; }
-    .size-btn {
-      width: 22px; height: 22px; border-radius: 50%;
-      border: 2px solid #ccc; background: #fff; cursor: pointer;
-      display: inline-flex; align-items: center; justify-content: center;
-      padding: 0;
-    }
-    .size-btn.active {
-      border-color: #333;
-      box-shadow: inset 0 0 0 2px rgba(0,0,0,.04);
-    }
-    .size-indicator {
-      width: 0; height: 0; border-radius: 50%;
-      background: #000;
-      display: inline-block;
+    .hero h2 {
+        font-size: 1.8rem;
     }
 
-    
-    #textEditor {
-      position: absolute;
-      min-width: 120px;
-      min-height: 40px;
-      max-width: 320px;
-      resize: none;
-      font: 16px/1.2 Arial, sans-serif;
-      border: 1px solid #888;
-      border-radius: 6px;
-      padding: 6px;
-      background: rgba(255,255,255,0.95);
-      outline: none;
-      z-index: 20;
-      display: none;
+    .hero p {
+        font-size: 1rem;
     }
 
-    
-    @media (max-width: 600px) {
-      .toolbar { height: auto; padding: 8px; gap: 8px; }
+    .features {
+        flex-direction: column;
+        align-items: center;
     }
-  </style>
+}
+</style>
+    <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+    <script src="https://unpkg.com/feather-icons"></script>
 </head>
 <body>
+    <header class="header">
+        <div class="logo">
+            <h1>SyncBoard</h1>
+        </div>
+        <nav class="nav">
+            <ul>
+                <li><a href="#my-boards">My Boards</a></li>
+                <li><a href="#teams">Teams</a></li>
+                <li><a href="#settings">Settings</a></li>
+            </ul>
+        </nav>
+        <div class="auth-buttons">
+            <a href="/login"><button class="login-btn">Login</button></a>
+        </div>
+    </header>
 
-  
-  <div class="board" id="board">
-    <canvas id="boardCanvas"></canvas>
-    <textarea id="textEditor" placeholder="Type text and press Enter"></textarea>
-  </div>
+    <main class="main-content">
+        <section class="hero">
+            <div class="hero-content">
+                <h2>Realtime Collaboration Made Simple</h2>
+                <p>Draw, sketch, and collaborate in real-time with your team</p>
+                <a href="/board"><button class="cta-button">Start Drawing</button></a>
+            </div>
+        </section>
 
-  
-  <div class="toolbar" aria-label="Drawing tools">
-    <button class="tool-btn" id="penBtn" title="Pen (draw)">Pen</button>
-    <button class="tool-btn" id="eraserBtn" title="Eraser">Eraser</button>
-    <button class="tool-btn" id="textBtn" title="Text">Text</button>
+        <section class="features">
+            <div class="feature">
+                <i data-feather="edit-2"></i>
+                <h3>Realtime Drawing</h3>
+                <p>Draw together in real-time with your team members</p>
+            </div>
+            <div class="feature">
+                <i data-feather="users"></i>
+                <h3>Team Collaboration</h3>
+                <p>Invite your team and collaborate seamlessly</p>
+            </div>
+            <div class="feature">
+                <i data-feather="share-2"></i>
+                <h3>Easy Sharing</h3>
+                <p>Share boards with anyone instantly</p>
+            </div>
+        </section>
+    </main>
 
-    <div class="spacer"></div>
-
-    
-    <div class="color-palette" id="colorPalette" aria-label="Color palette"></div>
-
-    
-    <div class="size-selector" id="sizeSelector" aria-label="Marker size"></div>
-
-    
-    <button class="tool-btn" id="clearBtn" title="Clear canvas">Clear</button>
-  </div>
-
-  <script>
-    (function() {
-      const canvas = document.getElementById('boardCanvas');
-      const ctx = canvas.getContext('2d', { alpha: false }); 
-      const board = document.getElementById('board');
-      const textEditor = document.getElementById('textEditor');
-
-      
-      let drawing = false;
-      let currentColor = '#000000';
-      let brushSize = 6;
-      let tool = 'pen'; 
-      let lastX = 0, lastY = 0;
-
-      
-      const colors = [
-        '#000000','#333333','#9b9b9b','#ffffff',
-        '#e74c3c','#e67e22','#f1c40f','#2ecc71','#1abc9c',
-        '#3498db','#9b59b6','#e84393','#7f8c8d','#16a085'
-      ];
-      const sizes = [2, 4, 6, 8, 12, 16];
-
-      
-      const colorPalette = document.getElementById('colorPalette');
-      colors.forEach((c, idx) => {
-        const btn = document.createElement('button');
-        btn.className = 'swatch';
-        btn.style.background = c;
-        btn.setAttribute('data-color', c);
-        btn.style.outline = 'none';
-        btn.addEventListener('click', () => {
-          currentColor = c;
-          
-          document.querySelectorAll('.swatch').forEach(el => el.classList.remove('selected'));
-          btn.classList.add('selected');
-          if (tool === 'pen') {
-            
-          }
-        });
-        colorPalette.appendChild(btn);
-      });
-
-      
-      const firstSwatch = colorPalette.querySelector('.swatch');
-      if (firstSwatch) {
-        firstSwatch.classList.add('selected');
-      }
-
-      
-      const sizeSelector = document.getElementById('sizeSelector');
-      sizes.forEach((sz, i) => {
-        const btn = document.createElement('button');
-        btn.className = 'size-btn';
-        btn.setAttribute('data-size', sz);
-        btn.title = 'Size ' + sz + 'px';
-        
-        const dot = document.createElement('span');
-        dot.style.display = 'inline-block';
-        dot.style.width = sz + 'px';
-        dot.style.height = sz + 'px';
-        dot.style.borderRadius = '50%';
-        dot.style.background = '#000';
-        btn.appendChild(dot);
-
-        btn.addEventListener('click', () => {
-          brushSize = sz;
-          
-          document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('active'));
-          btn.classList.add('active');
-        });
-
-        
-        if (sz === brushSize) btn.classList.add('active');
-        sizeSelector.appendChild(btn);
-      });
-
-      
-      const penBtn = document.getElementById('penBtn');
-      const eraserBtn = document.getElementById('eraserBtn');
-      const textBtn = document.getElementById('textBtn');
-      const clearBtn = document.getElementById('clearBtn');
-
-      function setTool(t) {
-        tool = t;
-        document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
-        if (t === 'pen') penBtn.classList.add('active');
-        if (t === 'eraser') eraserBtn.classList.add('active');
-        if (t === 'text') textBtn.classList.add('active');
-      }
-
-      penBtn.addEventListener('click', () => setTool('pen'));
-      eraserBtn.addEventListener('click', () => setTool('eraser'));
-      textBtn.addEventListener('click', () => setTool('text'));
-
-      
-      setTool('pen');
-
-      
-      function getPos(evt) {
-        const rect = canvas.getBoundingClientRect();
-        let x, y;
-        if (evt.touches && evt.touches.length) {
-          x = evt.touches[0].clientX - rect.left;
-          y = evt.touches[0].clientY - rect.top;
-        } else {
-          x = evt.clientX - rect.left;
-          y = evt.clientY - rect.top;
-        }
-        return { x, y };
-      }
-
-      
-      function start(x, y) {
-        drawing = true;
-        lastX = x;
-        lastY = y;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        ctx.globalCompositeOperation = 'source-over';
-        ctx.strokeStyle = currentColor;
-        ctx.fillStyle = currentColor;
-        ctx.lineWidth = brushSize;
-        if (tool === 'eraser') {
-            ctx.fillStyle = "#fff";
-            ctx.strokeStyle = "#fff";
-        }
-      }
-
-      function drawTo(x, y) {
-        if (!drawing) return;
-        ctx.beginPath();
-        ctx.moveTo(lastX, lastY);
-        ctx.lineTo(x, y);
-        ctx.stroke();
-        lastX = x;
-        lastY = y;
-      }
-
-      function end() {
-        drawing = false;
-      }
-
-      
-      canvas.addEventListener('mousedown', (e) => {
-        if (tool === 'text') {
-          handleTextPlacement(e);
-          return;
-        }
-        const p = getPos(e);
-        start(p.x, p.y);
-      });
-      canvas.addEventListener('mousemove', (e) => {
-        const p = getPos(e);
-        if (drawing) drawTo(p.x, p.y);
-      });
-      window.addEventListener('mouseup', end);
-
-      
-      canvas.addEventListener('touchstart', (e) => {
-        if (tool === 'text') {
-          handleTextPlacement(e.touches[0]);
-          return;
-        }
-        const p = getPos(e);
-        start(p.x, p.y);
-        e.preventDefault();
-      }, { passive: false });
-      canvas.addEventListener('touchmove', (e) => {
-        const p = getPos(e);
-        if (drawing) drawTo(p.x, p.y);
-        e.preventDefault();
-      }, { passive: false });
-      window.addEventListener('touchend', end);
-
-      
-      function handleTextPlacement(eventOrTouch) {
-        const rect = canvas.getBoundingClientRect();
-        const x = (eventOrTouch.clientX || 0) - rect.left;
-        const y = (eventOrTouch.clientY || 0) - rect.top;
-
-        
-        textEditor.style.display = 'block';
-        textEditor.style.left = x + 'px';
-        textEditor.style.top = y + 'px';
-        textEditor.value = '';
-        textEditor.focus();
-      }
-
-      
-      textEditor.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-          e.preventDefault();
-          const text = textEditor.value;
-          const x = parseInt(textEditor.style.left, 10) || 0;
-          const y = parseInt(textEditor.style.top, 10) || 0;
-          finalizeText(text, x, y);
-          console.log("Revert");
-          textEditor.style.display = 'none';
-          textEditor.value = '';
-        }
-    });
-
-      function finalizeText(text, x, y) {
-        if (!text) return;
-        
-        const fontSize = Math.max(12, brushSize * 2);
-        ctx.save();
-        ctx.fillStyle = currentColor;
-        ctx.font = fontSize + 'px sans-serif';
-        const lines = text.split('\n');
-        const lineHeight = fontSize * 1.2;
-        for (let i = 0; i < lines.length; i++) {
-          ctx.fillText(lines[i], x, y + i * lineHeight);
-        }
-        ctx.restore();
-      }
-
-      
-      function resize() {
-        const dpr = window.devicePixelRatio || 1;
-        const w = board.clientWidth;
-        const h = board.clientHeight;
-        
-        canvas.width = Math.floor(w * dpr);
-        canvas.height = Math.floor(h * dpr);
-        
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        
-        ctx.fillStyle = '#fff';
-        ctx.fillRect(0, 0, w, h);
-      }
-
-      window.addEventListener('resize', resize);
-      resize();
-
-      
-      clearBtn.addEventListener('click', () => {
-        
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        
-        ctx.fillStyle = '#fff';
-        ctx.fillRect(0, 0, board.clientWidth, board.clientHeight);
-      });
-
-    })();
-  </script>
+    <script>feather.replace();</script>
 </body>
 </html>
