@@ -1,9 +1,13 @@
 package board
 
 import (
+	"encoding/json"
 	"errors"
 	"strings"
+	"sync"
 	"sync-board/models"
+
+	"github.com/gorilla/websocket"
 )
 
 type App interface {
@@ -12,10 +16,15 @@ type App interface {
 
 type BoardService struct {
 	app App
+	hub *Hub
 }
 
 func NewBoardService(app App) (*BoardService, error) {
-	return &BoardService{app: app}, nil
+	s := &BoardService{
+		app: app,
+		hub: NewHub(),
+	}
+	return s, nil
 }
 
 func parseTags(tags string) []string {
@@ -182,4 +191,96 @@ func (s *BoardService) GetBoardByIDAndOwner(id uint, ownerID uint) (*models.Boar
 		return nil, err
 	}
 	return &board, nil
+}
+
+func (s *BoardService) GetHub() *Hub {
+	return s.hub
+}
+
+type Hub struct {
+	boards map[uint]map[*websocket.Conn]*Client
+	mutex  sync.RWMutex
+}
+
+type Client struct {
+	Conn     *websocket.Conn
+	BoardID  uint
+	Username string
+	Send     chan []byte
+}
+
+type Message struct {
+	Type    string          `json:"type"`
+	Payload json.RawMessage `json:"payload"`
+}
+
+type DrawPayload struct {
+	X1    float64 `json:"x1"`
+	Y1    float64 `json:"y1"`
+	X2    float64 `json:"x2"`
+	Y2    float64 `json:"y2"`
+	Color string  `json:"color"`
+	Size  float64 `json:"size"`
+	Tool  string  `json:"tool"`
+}
+
+type TextPayload struct {
+	X     float64 `json:"x"`
+	Y     float64 `json:"y"`
+	Text  string  `json:"text"`
+	Color string  `json:"color"`
+	Size  float64 `json:"size"`
+}
+
+type CursorPayload struct {
+	X     float64 `json:"x"`
+	Y     float64 `json:"y"`
+	Color string  `json:"color"`
+}
+
+func NewHub() *Hub {
+	return &Hub{
+		boards: make(map[uint]map[*websocket.Conn]*Client),
+	}
+}
+
+func (h *Hub) Register(client *Client) {
+	h.mutex.Lock()
+	defer h.mutex.Unlock()
+
+	if h.boards[client.BoardID] == nil {
+		h.boards[client.BoardID] = make(map[*websocket.Conn]*Client)
+	}
+	h.boards[client.BoardID][client.Conn] = client
+}
+
+func (h *Hub) Unregister(client *Client) {
+	h.mutex.Lock()
+	defer h.mutex.Unlock()
+
+	if clients, ok := h.boards[client.BoardID]; ok {
+		if _, ok := clients[client.Conn]; ok {
+			delete(clients, client.Conn)
+			close(client.Send)
+			if len(clients) == 0 {
+				delete(h.boards, client.BoardID)
+			}
+		}
+	}
+}
+
+func (h *Hub) Broadcast(boardID uint, message []byte, exclude *websocket.Conn) {
+	h.mutex.RLock()
+	defer h.mutex.RUnlock()
+
+	if clients, ok := h.boards[boardID]; ok {
+		for conn, client := range clients {
+			if conn != exclude {
+				select {
+				case client.Send <- message:
+				default:
+				}
+			}
+		}
+	}
 }

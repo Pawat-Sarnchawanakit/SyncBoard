@@ -113,6 +113,48 @@
       display: none;
     }
 
+    .remote-cursor {
+      position: absolute;
+      pointer-events: none;
+      z-index: 100;
+      transition: left 0.1s linear, top 0.1s linear;
+      opacity: 0.7;
+    }
+
+    .remote-cursor svg {
+      width: 24px;
+      height: 24px;
+      filter: drop-shadow(1px 1px 1px rgba(0,0,0,0.3));
+    }
+
+    .remote-cursor-label {
+      position: absolute;
+      left: 20px;
+      top: 20px;
+      background: rgba(0,0,0,0.75);
+      color: #fff;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .cursor-connected {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      background: #28a745;
+      color: white;
+      padding: 4px 12px;
+      border-radius: 4px;
+      font-size: 12px;
+      z-index: 1000;
+    }
+
+    .cursor-disconnected {
+      background: #dc3545;
+    }
+
     
     @media (max-width: 600px) {
       .toolbar { height: auto; padding: 8px; gap: 8px; }
@@ -121,10 +163,12 @@
 </head>
 <body>
 
+  <div id="connectionStatus" class="cursor-connected cursor-disconnected">Connecting...</div>
   
   <div class="board" id="board">
     <canvas id="boardCanvas"></canvas>
     <textarea id="textEditor" placeholder="Type text and press Enter"></textarea>
+    <div id="cursorsContainer"></div>
   </div>
 
   
@@ -151,6 +195,8 @@
       const ctx = canvas.getContext('2d', { alpha: false }); 
       const board = document.getElementById('board');
       const textEditor = document.getElementById('textEditor');
+      const cursorsContainer = document.getElementById('cursorsContainer');
+      const connectionStatus = document.getElementById('connectionStatus');
 
       
       let drawing = false;
@@ -158,6 +204,10 @@
       let brushSize = 6;
       let tool = 'pen'; 
       let lastX = 0, lastY = 0;
+
+      let ws = null;
+      let boardId = null;
+      let remoteCursors = {};
 
       
       const colors = [
@@ -257,7 +307,7 @@
       }
 
       
-      function start(x, y) {
+      function start(x, y, isRemote = false) {
         drawing = true;
         lastX = x;
         lastY = y;
@@ -273,7 +323,7 @@
         }
       }
 
-      function drawTo(x, y) {
+      function drawTo(x, y, isRemote = false) {
         if (!drawing) return;
         ctx.beginPath();
         ctx.moveTo(lastX, lastY);
@@ -283,8 +333,71 @@
         lastY = y;
       }
 
-      function end() {
+      function end(isRemote = false) {
         drawing = false;
+      }
+
+      
+      function sendDraw(x1, y1, x2, y2) {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({
+            type: 'draw',
+            x1: x1,
+            y1: y1,
+            x2: x2,
+            y2: y2,
+            color: tool === 'eraser' ? '#ffffff' : currentColor,
+            size: brushSize,
+            tool: tool
+          }));
+        }
+      }
+
+      
+      function sendText(x, y, text) {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({
+            type: 'text',
+            x: x,
+            y: y,
+            text: text,
+            color: currentColor,
+            size: brushSize
+          }));
+        }
+      }
+
+      
+      function sendCursor(x, y) {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({
+            type: 'cursor',
+            payload: {
+              x: x,
+              y: y,
+              color: currentColor
+            },
+          }));
+        }
+      }
+
+      
+      function sendClear() {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({
+            type: 'clear'
+          }));
+        }
+      }
+
+      
+      let cursorThrottle = null;
+      function throttledSendCursor(x, y) {
+        if (cursorThrottle) return;
+        cursorThrottle = setTimeout(() => {
+          cursorThrottle = null;
+        }, 50);
+        sendCursor(x, y);
       }
 
       
@@ -298,9 +411,15 @@
       });
       canvas.addEventListener('mousemove', (e) => {
         const p = getPos(e);
-        if (drawing) drawTo(p.x, p.y);
+        throttledSendCursor(p.x, p.y);
+        if (drawing) {
+          sendDraw(lastX, lastY, p.x, p.y);
+          drawTo(p.x, p.y);
+        }
       });
-      window.addEventListener('mouseup', end);
+      window.addEventListener('mouseup', () => {
+        end();
+      });
 
       
       canvas.addEventListener('touchstart', (e) => {
@@ -314,10 +433,16 @@
       }, { passive: false });
       canvas.addEventListener('touchmove', (e) => {
         const p = getPos(e);
-        if (drawing) drawTo(p.x, p.y);
+        throttledSendCursor(p.x, p.y);
+        if (drawing) {
+          sendDraw(lastX, lastY, p.x, p.y);
+          drawTo(p.x, p.y);
+        }
         e.preventDefault();
       }, { passive: false });
-      window.addEventListener('touchend', end);
+      window.addEventListener('touchend', () => {
+        end();
+      });
 
       
       function handleTextPlacement(eventOrTouch) {
@@ -341,18 +466,18 @@
           const x = parseInt(textEditor.style.left, 10) || 0;
           const y = parseInt(textEditor.style.top, 10) || 0;
           finalizeText(text, x, y);
-          console.log("Revert");
+          sendText(x, y, text);
           textEditor.style.display = 'none';
           textEditor.value = '';
         }
     });
 
-      function finalizeText(text, x, y) {
+      function finalizeText(text, x, y, isRemote = false, remoteColor = null, remoteSize = null) {
         if (!text) return;
         
-        const fontSize = Math.max(12, brushSize * 2);
+        const fontSize = Math.max(12, (remoteSize || brushSize) * 2);
         ctx.save();
-        ctx.fillStyle = currentColor;
+        ctx.fillStyle = remoteColor || currentColor;
         ctx.font = fontSize + 'px sans-serif';
         const lines = text.split('\n');
         const lineHeight = fontSize * 1.2;
@@ -360,6 +485,13 @@
           ctx.fillText(lines[i], x, y + i * lineHeight);
         }
         ctx.restore();
+      }
+
+      
+      function clearCanvas() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, board.clientWidth, board.clientHeight);
       }
 
       
@@ -382,12 +514,121 @@
 
       
       clearBtn.addEventListener('click', () => {
-        
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        
-        ctx.fillStyle = '#fff';
-        ctx.fillRect(0, 0, board.clientWidth, board.clientHeight);
+        clearCanvas();
+        sendClear();
       });
+
+      
+      function connectWebSocket() {
+        const urlParams = new URLSearchParams(window.location.search);
+        boardId = urlParams.get('id');
+        
+        if (!boardId) {
+          connectionStatus.textContent = 'No board ID';
+          return;
+        }
+
+        const wsUrl = 'ws://' + window.location.host + '/api/sync-board?board_id=' + boardId;
+        ws = new WebSocket(wsUrl);
+
+        ws.onopen = function() {
+          connectionStatus.textContent = 'Connected';
+          connectionStatus.classList.remove('cursor-disconnected');
+        };
+
+        ws.onclose = function() {
+          connectionStatus.textContent = 'Disconnected - Reconnecting...';
+          connectionStatus.classList.add('cursor-disconnected');
+          setTimeout(connectWebSocket, 2000);
+        };
+
+        ws.onerror = function() {
+          connectionStatus.textContent = 'Connection error';
+        };
+
+        ws.onmessage = function(event) {
+          try {
+            const msg = JSON.parse(event.data);
+            handleMessage(msg);
+          } catch (e) {
+            console.error('Failed to parse message:', e);
+          }
+        };
+      }
+
+      function handleMessage(msg) {
+        console.log(msg.type);
+        switch (msg.type) {
+          case 'draw':
+            handleDraw(msg);
+            break;
+          case 'text':
+            handleText(msg);
+            break;
+          case 'cursor':
+            handleCursor(msg);
+            break;
+          case 'clear':
+            clearCanvas();
+            break;
+        }
+      }
+
+      function handleDraw(msg) {
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.strokeStyle = msg.color;
+        ctx.fillStyle = msg.color;
+        ctx.lineWidth = msg.size;
+        
+        ctx.beginPath();
+        ctx.moveTo(msg.x1, msg.y1);
+        ctx.lineTo(msg.x2, msg.y2);
+        ctx.stroke();
+      }
+
+      function handleText(msg) {
+        finalizeText(msg.text, msg.x, msg.y, true, msg.color, msg.size);
+      }
+
+      function handleCursor(msg) {
+        if (!msg.username) return;
+        
+        let cursorEl = remoteCursors[msg.username];
+        if (!cursorEl) {
+          cursorEl = document.createElement('div');
+          cursorEl.className = 'remote-cursor';
+          
+          const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+          svg.setAttribute('viewBox', '0 0 24 24');
+          svg.style.fill = msg.color || '#e74c3c';
+          svg.innerHTML = '<path d="M5.5 3.21V20.8c0 .45.54.67.85.35l4.86-4.86a.5.5 0 0 1 .35-.15h6.87c.48 0 .72-.58.38-.92L5.88 2.85a.5.5 0 0 0-.38.36z"/>';
+          cursorEl.appendChild(svg);
+          
+          const label = document.createElement('div');
+          label.className = 'remote-cursor-label';
+          label.textContent = msg.username;
+          cursorEl.appendChild(label);
+          
+          cursorsContainer.appendChild(cursorEl);
+          remoteCursors[msg.username] = cursorEl;
+        }
+        cursorEl.querySelector("svg").style.fill = msg.color || '#e74c3c';
+        cursorEl.style.left = msg.x + 'px';
+        cursorEl.style.top = msg.y + 'px';
+        cursorEl.style.opacity = '0.7';
+      }
+
+      
+      setInterval(function() {
+        for (const username in remoteCursors) {
+          const cursorEl = remoteCursors[username];
+          cursorEl.style.opacity = '0.5';
+        }
+      }, 3000);
+
+      connectWebSocket();
 
     })();
   </script>

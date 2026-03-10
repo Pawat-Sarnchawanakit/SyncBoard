@@ -1,13 +1,22 @@
 package board
 
 import (
+	"encoding/json"
+	"log"
 	"net/http"
 	"strconv"
 	"sync-board/services"
-	"sync-board/services/board"
+	boardsvc "sync-board/services/board"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gorilla/websocket"
 )
+
+var upgrader = websocket.Upgrader{
+	ReadBufferSize:  4096,
+	WriteBufferSize: 4096,
+	CheckOrigin:     func(r *http.Request) bool { return true },
+}
 
 type App interface {
 	GetRouter() *gin.Engine
@@ -134,7 +143,7 @@ func updateBoardHandler(app App, c *gin.Context) {
 		return
 	}
 
-	input := board.UpdateBoardInput{}
+	input := boardsvc.UpdateBoardInput{}
 	if req.Title != nil {
 		input.Title = req.Title
 	}
@@ -216,10 +225,124 @@ func deleteBoardHandler(app App, c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "deleted"})
 }
 
+type WSApp interface {
+	GetServices() *services.Services
+}
+
+func wsHandler(app WSApp, c *gin.Context) {
+	boardIDStr := c.Query("board_id")
+	if boardIDStr == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "board_id required"})
+		return
+	}
+
+	boardID, err := strconv.ParseUint(boardIDStr, 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid board_id"})
+		return
+	}
+
+	token, err := c.Cookie("tk")
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	userID, err := app.GetServices().AuthenticationService.VerifyToken(token)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	board, err := app.GetServices().BoardService.GetBoardByIDAndOwner(uint(boardID), userID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "board not found"})
+		return
+	}
+
+	user, err := app.GetServices().AuthenticationService.GetUserByID(userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "user not found"})
+		return
+	}
+
+	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
+	if err != nil {
+		return
+	}
+
+	client := &boardsvc.Client{
+		Conn:     conn,
+		BoardID:  board.ID,
+		Username: user.Username,
+		Send:     make(chan []byte, 256),
+	}
+
+	hub := app.GetServices().BoardService.GetHub()
+	hub.Register(client)
+
+	go writePump(client)
+	go readPump(app, hub, client)
+}
+
+func readPump(app WSApp, hub *boardsvc.Hub, c *boardsvc.Client) {
+	defer func() {
+		hub.Unregister(c)
+		c.Conn.Close()
+	}()
+
+	for {
+		_, message, err := c.Conn.ReadMessage()
+		if err != nil {
+			break
+		}
+
+		var msg boardsvc.Message
+		if err := json.Unmarshal(message, &msg); err != nil {
+			continue
+		}
+
+		switch msg.Type {
+		case "draw":
+			hub.Broadcast(c.BoardID, message, c.Conn)
+		case "text":
+			hub.Broadcast(c.BoardID, message, c.Conn)
+		case "cursor":
+			var payload boardsvc.CursorPayload
+			if err := json.Unmarshal(msg.Payload, &payload); err != nil {
+				log.Println(err);
+			}
+			payloadWithUsername, _ := json.Marshal(map[string]interface{}{
+				"type":     "cursor",
+				"x":        payload.X,
+				"y":        payload.Y,
+				"color":    payload.Color,
+				"username": c.Username,
+			})
+			hub.Broadcast(c.BoardID, payloadWithUsername, c.Conn)
+		case "clear":
+			hub.Broadcast(c.BoardID, message, c.Conn)
+		}
+	}
+}
+
+func writePump(c *boardsvc.Client) {
+	defer c.Conn.Close()
+	for {
+		message, ok := <-c.Send
+		if !ok {
+			c.Conn.WriteMessage(websocket.CloseMessage, []byte{})
+			return
+		}
+		if err := c.Conn.WriteMessage(websocket.TextMessage, message); err != nil {
+			return
+		}
+	}
+}
+
 func RegisterHandlers(app App) {
 	router := app.GetRouter()
-	router.GET("/ws", func(c *gin.Context) {
-	})
+	router.GET("/api/sync-board", func(c *gin.Context) { wsHandler(app, c) })
 	router.POST("/api/boards", func(c *gin.Context) { createBoardHandler(app, c) })
 	router.GET("/api/boards", func(c *gin.Context) { getBoardsHandler(app, c) })
 	router.GET("/api/boards/:id", func(c *gin.Context) { getBoardHandler(app, c) })

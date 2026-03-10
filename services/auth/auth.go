@@ -19,8 +19,8 @@ type App interface {
 	GetDatastore() *models.DataStore
 }
 
-type AuthenticationService struct{
-	app App
+type AuthenticationService struct {
+	app          App
 	token_secret []byte
 }
 
@@ -40,11 +40,11 @@ func NewAuthenticationService(app App) (*AuthenticationService, error) {
 }
 
 var argon2id_params = &argon2id.Params{
-	Memory: 131072,
-	Iterations: 6,
+	Memory:      131072,
+	Iterations:  6,
 	Parallelism: 1,
-	SaltLength: 16,
-	KeyLength: 32,
+	SaltLength:  16,
+	KeyLength:   32,
 }
 
 func (cur *AuthenticationService) SignUp(username string, password string) (string, error) {
@@ -66,7 +66,6 @@ func (cur *AuthenticationService) SignUp(username string, password string) (stri
 	}
 	return token, nil
 }
-
 
 func (cur *AuthenticationService) Login(username string, password string) (string, error) {
 	datastore := cur.app.GetDatastore()
@@ -134,4 +133,13 @@ func (cur *AuthenticationService) VerifyToken(token string) (uint, error) {
 		return 0, errors.New("Token expired")
 	}
 	return uint(user_id), nil
+}
+
+func (cur *AuthenticationService) GetUserByID(id uint) (*models.User, error) {
+	datastore := cur.app.GetDatastore()
+	user := models.User{}
+	if err := datastore.GormDB.First(&user, id).Error; err != nil {
+		return nil, err
+	}
+	return &user, nil
 }
