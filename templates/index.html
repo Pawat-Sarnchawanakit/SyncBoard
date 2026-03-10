@@ -208,7 +208,11 @@ body {
         </div>
         <nav class="nav">
             <ul>
-                <li><a href="#my-boards">My Boards</a></li>
+                {{if .Authenticated}}
+                <li><a href="/myboards">My Boards</a></li>
+                {{else}}
+                <li><a href="/login">My Boards</a></li>
+                {{end}}
                 <li><a href="#teams">Teams</a></li>
                 <li><a href="#settings">Settings</a></li>
             </ul>
@@ -234,7 +238,11 @@ body {
             <div class="hero-content">
                 <h2>Realtime Collaboration Made Simple</h2>
                 <p>Draw, sketch, and collaborate in real-time with your team</p>
+                {{if .Authenticated}}
+                <a href="/myboards"><button class="cta-button">Go to My Boards</button></a>
+                {{else}}
                 <a href="/board"><button class="cta-button">Start Drawing</button></a>
+                {{end}}
             </div>
         </section>
 

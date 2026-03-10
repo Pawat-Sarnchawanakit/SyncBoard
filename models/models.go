@@ -14,6 +14,6 @@ func NewDataStore() (*DataStore, error) {
 	if err != nil {
 		return nil, err
 	}
-	db.AutoMigrate(&User{})
-	return &DataStore{ GormDB: db }, nil
+	db.AutoMigrate(&User{}, &Board{})
+	return &DataStore{GormDB: db}, nil
 }

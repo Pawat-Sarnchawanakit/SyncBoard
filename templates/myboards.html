@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Boards - SyncBoard</title>
+    <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fa;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 2rem;
+            background-color: #ffffff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .logo h1 {
+            color: #007bff;
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .logo a {
+            text-decoration: none;
+        }
+
+        .nav ul {
+            display: flex;
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        .nav ul li {
+            margin: 0 1rem;
+        }
+
+        .nav ul li a {
+            text-decoration: none;
+            color: #333;
+            font-weight: 500;
+            transition: color 0.3s ease;
+        }
+
+        .nav ul li a:hover {
+            color: #007bff;
+        }
+
+        .logout-btn {
+            background-color: #6c757d;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background-color 0.3s ease;
+        }
+
+        .logout-btn:hover {
+            background-color: #5a6268;
+        }
+
+        .main-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        .page-header h2 {
+            font-size: 1.8rem;
+            color: #333;
+        }
+
+        .create-board-btn {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 0.7rem 1.5rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 1rem;
+            transition: background-color 0.3s ease;
+        }
+
+        .create-board-btn:hover {
+            background-color: #0056b3;
+        }
+
+        .boards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .board-card {
+            background: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            padding: 1.5rem;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            position: relative;
+        }
+
+        .board-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+        }
+
+        .board-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 0.5rem;
+        }
+
+        .board-card h3 {
+            font-size: 1.2rem;
+            color: #333;
+            margin: 0;
+            word-break: break-word;
+            flex: 1;
+            cursor: pointer;
+        }
+
+        .board-card h3:hover {
+            color: #007bff;
+        }
+
+        .card-actions {
+            display: flex;
+            gap: 0.5rem;
+            flex-shrink: 0;
+        }
+
+        .action-btn {
+            background: #f8f9fa;
+            color: #6c757d;
+            border: 1px solid #dee2e6;
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+
+        .action-btn:hover {
+            background: #e9ecef;
+            color: #495057;
+        }
+
+        .action-btn.delete:hover {
+            background: #f8d7da;
+            color: #dc3545;
+            border-color: #f5c6cb;
+        }
+
+        .action-btn svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        .board-description {
+            font-size: 0.875rem;
+            color: #666;
+            margin-bottom: 0.75rem;
+            word-break: break-word;
+        }
+
+        .board-meta {
+            font-size: 0.75rem;
+            color: #999;
+            margin-bottom: 0.75rem;
+        }
+
+        .tags-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .tag {
+            background: #e9ecef;
+            color: #495057;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .tag-remove {
+            cursor: pointer;
+            color: #6c757d;
+            font-weight: bold;
+        }
+
+        .tag-remove:hover {
+            color: #dc3545;
+        }
+
+        .add-tag-btn {
+            background: transparent;
+            border: 1px dashed #adb5bd;
+            color: #6c757d;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .add-tag-btn:hover {
+            border-color: #007bff;
+            color: #007bff;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: #666;
+        }
+
+        .empty-state h3 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            color: #333;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.show {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            width: 100%;
+            max-width: 450px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+        }
+
+        .modal-content h3 {
+            margin-bottom: 1.5rem;
+            font-size: 1.3rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 0.7rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 1rem;
+            font-family: inherit;
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 0 0.2rem rgba(0,123,255,0.25);
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 1rem;
+            justify-content: flex-end;
+        }
+
+        .btn-cancel {
+            background-color: #6c757d;
+            color: white;
+            border: none;
+            padding: 0.7rem 1.5rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background-color 0.3s ease;
+        }
+
+        .btn-cancel:hover {
+            background-color: #5a6268;
+        }
+
+        .btn-submit {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 0.7rem 1.5rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background-color 0.3s ease;
+        }
+
+        .btn-submit:hover {
+            background-color: #0056b3;
+        }
+
+        .btn-submit:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+
+        .error-msg {
+            color: #dc3545;
+            font-size: 0.875rem;
+            margin-top: 0.5rem;
+        }
+
+        .confirm-delete-modal .modal-content {
+            max-width: 350px;
+            text-align: center;
+        }
+
+        .confirm-delete-modal h3 {
+            margin-bottom: 1rem;
+        }
+
+        .confirm-delete-modal p {
+            color: #666;
+            margin-bottom: 1.5rem;
+        }
+
+        .confirm-delete-modal .modal-actions {
+            justify-content: center;
+        }
+
+        .btn-danger {
+            background-color: #dc3545;
+        }
+
+        .btn-danger:hover {
+            background-color: #c82333;
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                padding: 1rem;
+            }
+
+            .nav ul {
+                margin-top: 1rem;
+            }
+
+            .page-header {
+                flex-direction: column;
+                gap: 1rem;
+                align-items: flex-start;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="logo">
+            <a href="/"><h1>SyncBoard</h1></a>
+        </div>
+        <nav class="nav">
+            <ul>
+                <li><a href="/myboards">My Boards</a></li>
+                <li><a href="/">Home</a></li>
+            </ul>
+        </nav>
+        <button onclick="logout()" class="logout-btn">Logout</button>
+    </header>
+
+    <main class="main-content">
+        <div class="page-header">
+            <h2>My Boards</h2>
+            <button onclick="showCreateModal()" class="create-board-btn">+ Create New Board</button>
+        </div>
+
+        <div id="boardsGrid" class="boards-grid"></div>
+
+        <div id="emptyState" class="empty-state" style="display: none;">
+            <h3>No boards yet</h3>
+            <p>Create your first board to start collaborating!</p>
+        </div>
+    </main>
+
+    <div id="createModal" class="modal">
+        <div class="modal-content">
+            <h3>Create New Board</h3>
+            <form id="createBoardForm">
+                <div class="form-group">
+                    <label for="boardTitle">Board Title *</label>
+                    <input type="text" id="boardTitle" name="title" required minlength="1" maxlength="128" placeholder="Enter board title">
+                    <p id="titleError" class="error-msg" style="display: none;"></p>
+                </div>
+                <div class="form-group">
+                    <label for="boardDescription">Description</label>
+                    <textarea id="boardDescription" name="description" maxlength="500" placeholder="Optional description"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="boardTags">Tags (comma separated)</label>
+                    <input type="text" id="boardTags" name="tags" maxlength="500" placeholder="e.g. work, design, ideas">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" onclick="hideCreateModal()" class="btn-cancel">Cancel</button>
+                    <button type="submit" id="submitBtn" class="btn-submit">Create</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="addTagModal" class="modal">
+        <div class="modal-content">
+            <h3>Add Tag</h3>
+            <form id="addTagForm">
+                <input type="hidden" id="addTagBoardId" value="">
+                <div class="form-group">
+                    <label for="newTag">Tag</label>
+                    <input type="text" id="newTag" name="tag" required minlength="1" maxlength="50" placeholder="Enter tag">
+                    <p id="tagError" class="error-msg" style="display: none;"></p>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" onclick="hideAddTagModal()" class="btn-cancel">Cancel</button>
+                    <button type="submit" id="addTagSubmitBtn" class="btn-submit">Add</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="editModal" class="modal">
+        <div class="modal-content">
+            <h3>Edit Board</h3>
+            <form id="editBoardForm">
+                <input type="hidden" id="editBoardId" value="">
+                <div class="form-group">
+                    <label for="editBoardTitle">Board Title *</label>
+                    <input type="text" id="editBoardTitle" name="title" required minlength="1" maxlength="128" placeholder="Enter board title">
+                    <p id="editTitleError" class="error-msg" style="display: none;"></p>
+                </div>
+                <div class="form-group">
+                    <label for="editBoardDescription">Description</label>
+                    <textarea id="editBoardDescription" name="description" maxlength="500" placeholder="Optional description"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="editBoardTags">Tags (comma separated)</label>
+                    <input type="text" id="editBoardTags" name="tags" maxlength="500" placeholder="e.g. work, design, ideas">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" onclick="hideEditModal()" class="btn-cancel">Cancel</button>
+                    <button type="submit" id="editSubmitBtn" class="btn-submit">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="deleteModal" class="modal confirm-delete-modal">
+        <div class="modal-content">
+            <h3>Delete Board</h3>
+            <p>Are you sure you want to delete this board? This action cannot be undone.</p>
+            <input type="hidden" id="deleteBoardId" value="">
+            <div class="modal-actions">
+                <button type="button" onclick="hideDeleteModal()" class="btn-cancel">Cancel</button>
+                <button type="button" onclick="confirmDelete()" class="btn-submit btn-danger">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let boardsData = [];
+
+        function logout() {
+            fetch("/api/logout", {
+                method: "POST"
+            }).then(x => window.location.href = "/");
+        }
+
+        function showCreateModal() {
+            document.getElementById('createModal').classList.add('show');
+            document.getElementById('boardTitle').value = '';
+            document.getElementById('boardDescription').value = '';
+            document.getElementById('boardTags').value = '';
+            document.getElementById('titleError').style.display = 'none';
+            document.getElementById('submitBtn').disabled = false;
+            document.getElementById('submitBtn').textContent = 'Create';
+        }
+
+        function hideCreateModal() {
+            document.getElementById('createModal').classList.remove('show');
+        }
+
+        function showAddTagModal(boardId) {
+            document.getElementById('addTagModal').classList.add('show');
+            document.getElementById('addTagBoardId').value = boardId;
+            document.getElementById('newTag').value = '';
+            document.getElementById('tagError').style.display = 'none';
+            document.getElementById('addTagSubmitBtn').disabled = false;
+            document.getElementById('addTagSubmitBtn').textContent = 'Add';
+            setTimeout(() => document.getElementById('newTag').focus(), 100);
+        }
+
+        function hideAddTagModal() {
+            document.getElementById('addTagModal').classList.remove('show');
+        }
+
+        function showDeleteModal(boardId) {
+            document.getElementById('deleteModal').classList.add('show');
+            document.getElementById('deleteBoardId').value = boardId;
+        }
+
+        function hideDeleteModal() {
+            document.getElementById('deleteModal').classList.remove('show');
+        }
+
+        document.getElementById('createBoardForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const title = document.getElementById('boardTitle').value.trim();
+            const description = document.getElementById('boardDescription').value.trim();
+            const tags = document.getElementById('boardTags').value.trim();
+            const errorEl = document.getElementById('titleError');
+            const submitBtn = document.getElementById('submitBtn');
+
+            if (!title) {
+                errorEl.textContent = 'Title is required';
+                errorEl.style.display = 'block';
+                return;
+            }
+
+            if (title.length > 128) {
+                errorEl.textContent = 'Title must be 128 characters or less';
+                errorEl.style.display = 'block';
+                return;
+            }
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Creating...';
+
+            try {
+                const response = await fetch('/api/boards', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ title: title, description: description, tags: tags })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    hideCreateModal();
+                    loadBoards();
+                    window.location.href = '/board?id=' + data.id;
+                } else {
+                    errorEl.textContent = data.error || 'Failed to create board';
+                    errorEl.style.display = 'block';
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Create';
+                }
+            } catch (err) {
+                errorEl.textContent = 'An error occurred';
+                errorEl.style.display = 'block';
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Create';
+            }
+        });
+
+        document.getElementById('addTagForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const boardId = document.getElementById('addTagBoardId').value;
+            const tag = document.getElementById('newTag').value.trim();
+            const errorEl = document.getElementById('tagError');
+            const submitBtn = document.getElementById('addTagSubmitBtn');
+
+            if (!tag) {
+                errorEl.textContent = 'Tag is required';
+                errorEl.style.display = 'block';
+                return;
+            }
+
+            if (tag.length > 50) {
+                errorEl.textContent = 'Tag must be 50 characters or less';
+                errorEl.style.display = 'block';
+                return;
+            }
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Adding...';
+
+            try {
+                const response = await fetch('/api/boards/' + boardId + '/tags', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ tags: [tag] })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    hideAddTagModal();
+                    loadBoards();
+                } else {
+                    errorEl.textContent = data.error || 'Failed to add tag';
+                    errorEl.style.display = 'block';
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Add';
+                }
+            } catch (err) {
+                errorEl.textContent = 'An error occurred';
+                errorEl.style.display = 'block';
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Add';
+            }
+        });
+
+        function showEditModal(boardId) {
+            const board = boardsData.find(b => b.ID === boardId);
+            if (!board) return;
+
+            document.getElementById('editModal').classList.add('show');
+            document.getElementById('editBoardId').value = boardId;
+            document.getElementById('editBoardTitle').value = board.Title || '';
+            document.getElementById('editBoardDescription').value = board.Description || '';
+            document.getElementById('editBoardTags').value = board.Tags || '';
+            document.getElementById('editTitleError').style.display = 'none';
+            document.getElementById('editSubmitBtn').disabled = false;
+            document.getElementById('editSubmitBtn').textContent = 'Save';
+        }
+
+        function hideEditModal() {
+            document.getElementById('editModal').classList.remove('show');
+        }
+
+        document.getElementById('editBoardForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const boardId = document.getElementById('editBoardId').value;
+            const title = document.getElementById('editBoardTitle').value.trim();
+            const description = document.getElementById('editBoardDescription').value.trim();
+            const tags = document.getElementById('editBoardTags').value.trim();
+            const errorEl = document.getElementById('editTitleError');
+            const submitBtn = document.getElementById('editSubmitBtn');
+
+            if (!title) {
+                errorEl.textContent = 'Title is required';
+                errorEl.style.display = 'block';
+                return;
+            }
+
+            if (title.length > 128) {
+                errorEl.textContent = 'Title must be 128 characters or less';
+                errorEl.style.display = 'block';
+                return;
+            }
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Saving...';
+
+            try {
+                const response = await fetch('/api/boards/' + boardId, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        title: title,
+                        description: description,
+                        tags: tags
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    hideEditModal();
+                    loadBoards();
+                } else {
+                    errorEl.textContent = data.error || 'Failed to update board';
+                    errorEl.style.display = 'block';
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Save';
+                }
+            } catch (err) {
+                errorEl.textContent = 'An error occurred';
+                errorEl.style.display = 'block';
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Save';
+            }
+        });
+
+        async function confirmDelete() {
+            const boardId = document.getElementById('deleteBoardId').value;
+            const deleteBtn = document.querySelector('#deleteModal .btn-danger');
+            
+            deleteBtn.disabled = true;
+            deleteBtn.textContent = 'Deleting...';
+
+            try {
+                const response = await fetch('/api/boards/' + boardId, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    hideDeleteModal();
+                    loadBoards();
+                } else {
+                    const data = await response.json();
+                    alert(data.error || 'Failed to delete board');
+                    deleteBtn.disabled = false;
+                    deleteBtn.textContent = 'Delete';
+                }
+            } catch (err) {
+                alert('An error occurred');
+                deleteBtn.disabled = false;
+                deleteBtn.textContent = 'Delete';
+            }
+        }
+
+        function parseTags(tagsString) {
+            if (!tagsString) return [];
+            return tagsString.split(',').map(t => t.trim()).filter(t => t);
+        }
+
+        function renderTags(tags, boardId) {
+            if (!tags || tags.length === 0) {
+                return '<button class="add-tag-btn" onclick="showAddTagModal(' + boardId + ')">+ Add tag</button>';
+            }
+            return tags.map(tag => 
+                '<span class="tag">' + escapeHtml(tag) + '</span>'
+            ).join('') + '<button class="add-tag-btn" onclick="showAddTagModal(' + boardId + ')">+</button>';
+        }
+
+        async function loadBoards() {
+            try {
+                const response = await fetch('/api/boards');
+                const data = await response.json();
+
+                const boardsGrid = document.getElementById('boardsGrid');
+                const emptyState = document.getElementById('emptyState');
+
+                boardsData = data.boards || [];
+
+                if (response.ok && boardsData.length > 0) {
+                    boardsGrid.innerHTML = boardsData.map(board => {
+                        const tags = parseTags(board.Tags);
+                        return `
+                            <div class="board-card">
+                                <div class="board-card-header">
+                                    <h3 onclick="openBoard(${board.ID})">${escapeHtml(board.Title)}</h3>
+                                    <div class="card-actions">
+                                        <button class="action-btn" onclick="event.stopPropagation(); showEditModal(${board.ID})" title="Edit board">
+                                            <i data-feather="edit-3"></i>
+                                        </button>
+                                        <button class="action-btn delete" onclick="event.stopPropagation(); showDeleteModal(${board.ID})" title="Delete board">
+                                            <i data-feather="trash-2"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                ${board.Description ? '<p class="board-description">' + escapeHtml(board.Description) + '</p>' : ''}
+                                <p class="board-meta">Created: ${new Date(board.CreatedAt).toLocaleDateString()}</p>
+                                <div class="tags-container">
+                                    ${renderTags(tags, board.ID)}
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                    boardsGrid.style.display = 'grid';
+                    emptyState.style.display = 'none';
+                    feather.replace();
+                } else {
+                    boardsGrid.style.display = 'none';
+                    emptyState.style.display = 'block';
+                }
+            } catch (err) {
+                console.error('Failed to load boards:', err);
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function openBoard(id) {
+            window.location.href = '/board?id=' + id;
+        }
+
+        document.addEventListener('DOMContentLoaded', loadBoards);
+    </script>
+</body>
+</html>

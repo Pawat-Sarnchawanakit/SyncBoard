@@ -3,6 +3,7 @@ package app
 import (
 	"os"
 	"sync-board/handlers/auth"
+	"sync-board/handlers/board"
 	"sync-board/handlers/front"
 	"sync-board/models"
 	"sync-board/services"
@@ -37,6 +38,7 @@ func NewApp() (*App, error) {
 func (app *App) RegisterHandlers() {
 	front.RegisterHandlers(app)
 	auth.RegisterHandlers(app)
+	board.RegisterHandlers(app)
 }
 
 func (app *App) GetRouter() *gin.Engine {

@@ -21,6 +21,13 @@ func RegisterHandlers(app App) {
 			"Authenticated": auth.IsAuthenticated(app, c),
 		})
 	})
+	router.GET("/myboards", func(c *gin.Context) {
+		if !auth.IsAuthenticated(app, c) {
+			c.Redirect(http.StatusTemporaryRedirect, "/login")
+			return
+		}
+		c.HTML(http.StatusOK, "myboards.html", gin.H{})
+	})
 	router.GET("/board", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "board.html", gin.H{})
 	})
