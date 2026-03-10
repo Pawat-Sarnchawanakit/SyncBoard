@@ -603,7 +603,7 @@
                 if (response.ok) {
                     hideCreateModal();
                     loadBoards();
-                    window.location.href = '/board?id=' + data.id;
+                    window.location.href = '/board/' + data.id;
                 } else {
                     errorEl.textContent = data.error || 'Failed to create board';
                     errorEl.style.display = 'block';
@@ -837,7 +837,7 @@
         }
 
         function openBoard(id) {
-            window.location.href = '/board?id=' + id;
+            window.location.href = '/board/' + id;
         }
 
         document.addEventListener('DOMContentLoaded', loadBoards);

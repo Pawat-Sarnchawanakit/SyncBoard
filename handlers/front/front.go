@@ -28,8 +28,11 @@ func RegisterHandlers(app App) {
 		}
 		c.HTML(http.StatusOK, "myboards.html", gin.H{})
 	})
-	router.GET("/board", func(c *gin.Context) {
-		c.HTML(http.StatusOK, "board.html", gin.H{})
+	router.GET("/board/:id", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "board.html", gin.H{
+			"Authenticated": auth.IsAuthenticated(app, c),
+			"BoardId": c.Param("id"),
+		})
 	})
 	router.GET("/signup", func(c *gin.Context) {
 		if auth.IsAuthenticated(app, c) {
