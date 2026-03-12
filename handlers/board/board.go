@@ -132,13 +132,27 @@ func getBoardsHandler(app App, c *gin.Context) {
 		return
 	}
 
-	boards, err := app.GetServices().BoardService.GetUserBoardsWithAccess(userID)
+	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	if limit <= 0 || limit > 100 {
+		limit = 20
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	boards, total, err := app.GetServices().BoardService.GetUserBoardsWithAccess(userID, offset, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"boards": boards})
+	c.JSON(http.StatusOK, gin.H{
+		"boards": boards,
+		"total":  total,
+		"offset": offset,
+		"limit":  limit,
+	})
 }
 
 func getBoardHandler(app App, c *gin.Context) {

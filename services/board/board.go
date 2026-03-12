@@ -421,32 +421,60 @@ func (s *BoardService) CanEdit(boardID uint, userID uint) bool {
 	return permission == models.RoleOwner || permission == models.RoleEditor
 }
 
-func (s *BoardService) GetUserBoardsWithAccess(userID uint) ([]models.Board, error) {
+func (s *BoardService) GetUserBoardsWithAccess(userID uint, offset, limit int) ([]models.Board, int, error) {
 	datastore := s.app.GetDatastore()
-	var boards []models.Board
 
-	if err := datastore.GormDB.Where("owner_id = ?", userID).Order("created_at desc").Find(&boards).Error; err != nil {
-		return nil, err
+	var ownedCount int64
+	if err := datastore.GormDB.Model(&models.Board{}).Where("owner_id = ?", userID).Count(&ownedCount).Error; err != nil {
+		return nil, 0, err
 	}
 
 	var sharedBoardIDs []uint
 	var members []models.BoardMember
 	if err := datastore.GormDB.Where("user_id = ?", userID).Find(&members).Error; err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	for _, m := range members {
 		sharedBoardIDs = append(sharedBoardIDs, m.BoardID)
 	}
 
+	var sharedCount int64
 	if len(sharedBoardIDs) > 0 {
-		var sharedBoards []models.Board
-		if err := datastore.GormDB.Where("id IN ?", sharedBoardIDs).Find(&sharedBoards).Error; err != nil {
-			return nil, err
-		}
-		boards = append(boards, sharedBoards...)
+		datastore.GormDB.Model(&models.Board{}).Where("id IN ?", sharedBoardIDs).Count(&sharedCount)
 	}
 
-	return boards, nil
+	total := ownedCount + sharedCount
+
+	var boards []models.Board
+
+	ownedQuery := datastore.GormDB.Where("owner_id = ?", userID).Order("created_at desc").Offset(offset).Limit(limit)
+	if err := ownedQuery.Find(&boards).Error; err != nil {
+		return nil, 0, err
+	}
+
+	remaining := limit - len(boards)
+	if remaining > 0 && len(sharedBoardIDs) > 0 {
+		sharedOffset := offset - int(ownedCount)
+		if sharedOffset < 0 {
+			sharedOffset = 0
+		}
+		var sharedBoards []models.Board
+		if err := datastore.GormDB.Where("id IN ?", sharedBoardIDs).Order("created_at desc").Offset(sharedOffset).Limit(remaining).Find(&sharedBoards).Error; err != nil {
+			return nil, 0, err
+		}
+		boards = append(boards, sharedBoards...)
+	} else if offset < int(ownedCount) && len(sharedBoardIDs) > 0 && offset+limit > int(ownedCount) {
+		overlap := offset + limit - int(ownedCount)
+		if overlap > 0 {
+			var sharedBoards []models.Board
+			if err := datastore.GormDB.Where("id IN ?", sharedBoardIDs).Order("created_at desc").Limit(overlap).Find(&sharedBoards).Error; err != nil {
+				return nil, 0, err
+			}
+			boards = append(boards, sharedBoards...)
+		}
+	}
+
+	return boards, int(total), nil
 }
 
 type Hub struct {

@@ -600,9 +600,11 @@
 
                 const data = await response.json();
 
-                if (response.ok) {
-                    hideCreateModal();
-                    loadBoards();
+                    if (response.ok) {
+                        hideCreateModal();
+                        boardsOffset = 0;
+                        document.addEventListener('scroll', handleScroll);
+                        loadBoards();
                     window.location.href = '/board/' + data.id;
                 } else {
                     errorEl.textContent = data.error || 'Failed to create board';
@@ -653,6 +655,8 @@
 
                 if (response.ok) {
                     hideAddTagModal();
+                    boardsOffset = 0;
+                    document.addEventListener('scroll', handleScroll);
                     loadBoards();
                 } else {
                     errorEl.textContent = data.error || 'Failed to add tag';
@@ -727,6 +731,8 @@
 
                 if (response.ok) {
                     hideEditModal();
+                    boardsOffset = 0;
+                    document.addEventListener('scroll', handleScroll);
                     loadBoards();
                 } else {
                     errorEl.textContent = data.error || 'Failed to update board';
@@ -756,6 +762,8 @@
 
                 if (response.ok) {
                     hideDeleteModal();
+                    boardsOffset = 0;
+                    document.addEventListener('scroll', handleScroll);
                     loadBoards();
                 } else {
                     const data = await response.json();
@@ -784,18 +792,38 @@
             ).join('') + '<button class="add-tag-btn" onclick="showAddTagModal(' + boardId + ')">+</button>';
         }
 
-        async function loadBoards() {
+        let boardsOffset = 0;
+        let boardsLimit = 20;
+        let boardsTotal = 0;
+        let isLoadingBoards = false;
+
+        async function loadBoards(append = false) {
+            if (isLoadingBoards) return;
+            isLoadingBoards = true;
+
             try {
-                const response = await fetch('/api/boards');
+                const response = await fetch('/api/boards?offset=' + boardsOffset + '&limit=' + boardsLimit);
                 const data = await response.json();
 
                 const boardsGrid = document.getElementById('boardsGrid');
                 const emptyState = document.getElementById('emptyState');
 
-                boardsData = data.boards || [];
+                boardsTotal = data.total || 0;
+                const newBoards = data.boards || [];
+
+                if (!append) {
+                    boardsData = newBoards;
+                    boardsOffset = newBoards.length;
+                } else {
+                    boardsData = [...boardsData, ...newBoards];
+                    boardsOffset += newBoards.length;
+                }
 
                 if (response.ok && boardsData.length > 0) {
-                    boardsGrid.innerHTML = boardsData.map(board => {
+                    if (!append) {
+                        boardsGrid.innerHTML = '';
+                    }
+                    boardsGrid.innerHTML += newBoards.map(board => {
                         const tags = parseTags(board.Tags);
                         return `
                             <div class="board-card">
@@ -821,12 +849,28 @@
                     boardsGrid.style.display = 'grid';
                     emptyState.style.display = 'none';
                     feather.replace();
-                } else {
+                } else if (!append && boardsData.length === 0) {
                     boardsGrid.style.display = 'none';
                     emptyState.style.display = 'block';
                 }
+
+                if (boardsOffset >= boardsTotal) {
+                    document.removeEventListener('scroll', handleScroll);
+                }
             } catch (err) {
                 console.error('Failed to load boards:', err);
+            } finally {
+                isLoadingBoards = false;
+            }
+        }
+
+        function handleScroll() {
+            const scrollHeight = document.documentElement.scrollHeight;
+            const scrollTop = document.documentElement.scrollTop;
+            const clientHeight = document.documentElement.clientHeight;
+
+            if (scrollTop + clientHeight >= scrollHeight - 100) {
+                loadBoards(true);
             }
         }
 
@@ -840,7 +884,10 @@
             window.location.href = '/board/' + id;
         }
 
-        document.addEventListener('DOMContentLoaded', loadBoards);
+        document.addEventListener('DOMContentLoaded', function() {
+            loadBoards();
+            document.addEventListener('scroll', handleScroll);
+        });
     </script>
 </body>
 </html>
