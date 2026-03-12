@@ -40,6 +40,51 @@ type AddTagsRequest struct {
 	Tags []string `json:"tags" binding:"required,min=1"`
 }
 
+type AddMemberRequest struct {
+	Username string `json:"username" binding:"required"`
+	Role     string `json:"role"`
+}
+
+type UpdateMemberRequest struct {
+	Role string `json:"role" binding:"required"`
+}
+
+type MemberResponse struct {
+	ID       uint   `json:"id"`
+	UserID   uint   `json:"userId"`
+	Username string `json:"username"`
+	Role     string `json:"role"`
+}
+
+type WsMessage struct {
+	Type    string          `json:"type"`
+	Payload json.RawMessage `json:"payload"`
+}
+
+type DrawPayload struct {
+	X1    float64 `json:"x1"`
+	Y1    float64 `json:"y1"`
+	X2    float64 `json:"x2"`
+	Y2    float64 `json:"y2"`
+	Color string  `json:"color"`
+	Size  float64 `json:"size"`
+	Tool  string  `json:"tool"`
+}
+
+type TextPayload struct {
+	X     float64 `json:"x"`
+	Y     float64 `json:"y"`
+	Text  string  `json:"text"`
+	Color string  `json:"color"`
+	Size  float64 `json:"size"`
+}
+
+type CursorPayload struct {
+	X     float64 `json:"x"`
+	Y     float64 `json:"y"`
+	Color string  `json:"color"`
+}
+
 func getUserID(app App, c *gin.Context) (uint, bool) {
 	token, err := c.Cookie("tk")
 	if err != nil {
@@ -87,7 +132,7 @@ func getBoardsHandler(app App, c *gin.Context) {
 		return
 	}
 
-	boards, err := app.GetServices().BoardService.GetUserBoards(userID)
+	boards, err := app.GetServices().BoardService.GetUserBoardsWithAccess(userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -109,7 +154,12 @@ func getBoardHandler(app App, c *gin.Context) {
 		return
 	}
 
-	board, err := app.GetServices().BoardService.GetBoardByIDAndOwner(uint(boardID), userID)
+	if !app.GetServices().BoardService.HasViewAccess(uint(boardID), userID) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "no access to this board"})
+		return
+	}
+
+	board, err := app.GetServices().BoardService.GetBoard(uint(boardID))
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "board not found"})
 		return
@@ -121,6 +171,7 @@ func getBoardHandler(app App, c *gin.Context) {
 		"description": board.Description,
 		"tags":        board.Tags,
 		"createdAt":   board.CreatedAt,
+		"ownerId":     board.OwnerID,
 	})
 }
 
@@ -134,6 +185,12 @@ func updateBoardHandler(app App, c *gin.Context) {
 	boardID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid board id"})
+		return
+	}
+
+	permission, err := app.GetServices().BoardService.GetUserPermission(uint(boardID), userID)
+	if err != nil || permission != "owner" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "only owner can update board"})
 		return
 	}
 
@@ -182,6 +239,12 @@ func addTagsHandler(app App, c *gin.Context) {
 		return
 	}
 
+	permission, err := app.GetServices().BoardService.GetUserPermission(uint(boardID), userID)
+	if err != nil || (permission != "owner" && permission != "editor") {
+		c.JSON(http.StatusForbidden, gin.H{"error": "only owner and editors can add tags"})
+		return
+	}
+
 	var req AddTagsRequest
 	if err := c.BindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -213,6 +276,12 @@ func deleteBoardHandler(app App, c *gin.Context) {
 	boardID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid board id"})
+		return
+	}
+
+	permission, err := app.GetServices().BoardService.GetUserPermission(uint(boardID), userID)
+	if err != nil || permission != "owner" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "only owner can delete board"})
 		return
 	}
 
@@ -254,7 +323,18 @@ func wsHandler(app WSApp, c *gin.Context) {
 		return
 	}
 
-	board, err := app.GetServices().BoardService.GetBoardByIDAndOwner(uint(boardID), userID)
+	if !app.GetServices().BoardService.HasViewAccess(uint(boardID), userID) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "no access to this board"})
+		return
+	}
+
+	permission, err := app.GetServices().BoardService.GetUserPermission(uint(boardID), userID)
+	if err != nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": "no access to this board"})
+		return
+	}
+
+	board, err := app.GetServices().BoardService.GetBoard(uint(boardID))
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "board not found"})
 		return
@@ -272,10 +352,11 @@ func wsHandler(app WSApp, c *gin.Context) {
 	}
 
 	client := &boardsvc.Client{
-		Conn:     conn,
-		BoardID:  board.ID,
-		Username: user.Username,
-		Send:     make(chan []byte, 256),
+		Conn:       conn,
+		BoardID:    board.ID,
+		Username:   user.Username,
+		Send:       make(chan []byte, 256),
+		Permission: permission,
 	}
 
 	hub := app.GetServices().BoardService.GetHub()
@@ -297,20 +378,24 @@ func readPump(app WSApp, hub *boardsvc.Hub, c *boardsvc.Client) {
 			break
 		}
 
-		var msg boardsvc.Message
+		var msg WsMessage
 		if err := json.Unmarshal(message, &msg); err != nil {
 			continue
 		}
 
 		switch msg.Type {
 		case "draw":
-			hub.Broadcast(c.BoardID, message, c.Conn)
+			if c.Permission == "owner" || c.Permission == "editor" {
+				hub.Broadcast(c.BoardID, message, c.Conn)
+			}
 		case "text":
-			hub.Broadcast(c.BoardID, message, c.Conn)
+			if c.Permission == "owner" || c.Permission == "editor" {
+				hub.Broadcast(c.BoardID, message, c.Conn)
+			}
 		case "cursor":
-			var payload boardsvc.CursorPayload
+			var payload CursorPayload
 			if err := json.Unmarshal(msg.Payload, &payload); err != nil {
-				log.Println(err);
+				log.Println(err)
 			}
 			payloadWithUsername, _ := json.Marshal(map[string]interface{}{
 				"type":     "cursor",
@@ -321,7 +406,9 @@ func readPump(app WSApp, hub *boardsvc.Hub, c *boardsvc.Client) {
 			})
 			hub.Broadcast(c.BoardID, payloadWithUsername, c.Conn)
 		case "clear":
-			hub.Broadcast(c.BoardID, message, c.Conn)
+			if c.Permission == "owner" || c.Permission == "editor" {
+				hub.Broadcast(c.BoardID, message, c.Conn)
+			}
 		}
 	}
 }
@@ -340,12 +427,240 @@ func writePump(c *boardsvc.Client) {
 	}
 }
 
+func getUserIDWithUsername(app App, c *gin.Context) (uint, string, bool) {
+	token, err := c.Cookie("tk")
+	if err != nil {
+		return 0, "", false
+	}
+	userID, err := app.GetServices().AuthenticationService.VerifyToken(token)
+	if err != nil {
+		return 0, "", false
+	}
+	user, err := app.GetServices().AuthenticationService.GetUserByID(userID)
+	if err != nil {
+		return 0, "", false
+	}
+	return userID, user.Username, true
+}
+
+func getBoardAccessHandler(app App, c *gin.Context) {
+	userID, ok := getUserID(app, c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	boardID, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid board id"})
+		return
+	}
+
+	permission, err := app.GetServices().BoardService.GetUserPermission(uint(boardID), userID)
+	if err != nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": "no access to this board"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"permission": permission})
+}
+
+func getBoardMembersHandler(app App, c *gin.Context) {
+	userID, ok := getUserID(app, c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	boardID, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid board id"})
+		return
+	}
+
+	if !app.GetServices().BoardService.HasViewAccess(uint(boardID), userID) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "no access to this board"})
+		return
+	}
+
+	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	if limit <= 0 || limit > 100 {
+		limit = 20
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	members, total, err := app.GetServices().BoardService.GetBoardMembersPaginated(uint(boardID), offset, limit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	var response []MemberResponse
+	for _, m := range members {
+		response = append(response, MemberResponse{
+			ID:       m.ID,
+			UserID:   m.UserID,
+			Username: m.Username,
+			Role:     m.Role,
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"members": response,
+		"total":   total,
+		"offset":  offset,
+		"limit":   limit,
+	})
+}
+
+func addBoardMemberHandler(app App, c *gin.Context) {
+	userID, ok := getUserID(app, c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	boardID, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid board id"})
+		return
+	}
+
+	permission, err := app.GetServices().BoardService.GetUserPermission(uint(boardID), userID)
+	if err != nil || permission != "owner" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "only owner can add members"})
+		return
+	}
+
+	var req AddMemberRequest
+	if err := c.BindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	users, err := app.GetServices().AuthenticationService.SearchUsers(req.Username, 10)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	var targetUserID uint
+	found := false
+	for _, u := range users {
+		if u.Username == req.Username {
+			targetUserID = u.ID
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+		return
+	}
+
+	role := req.Role
+	if role == "" {
+		role = "viewer"
+	}
+
+	err = app.GetServices().BoardService.AddMember(uint(boardID), userID, targetUserID, role)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "member added"})
+}
+
+func removeBoardMemberHandler(app App, c *gin.Context) {
+	userID, ok := getUserID(app, c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	boardID, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid board id"})
+		return
+	}
+
+	permission, err := app.GetServices().BoardService.GetUserPermission(uint(boardID), userID)
+	if err != nil || permission != "owner" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "only owner can remove members"})
+		return
+	}
+
+	targetUserID, err := strconv.ParseUint(c.Param("userId"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user id"})
+		return
+	}
+
+	err = app.GetServices().BoardService.RemoveMember(uint(boardID), userID, uint(targetUserID))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "member removed"})
+}
+
+func updateBoardMemberHandler(app App, c *gin.Context) {
+	userID, ok := getUserID(app, c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	boardID, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid board id"})
+		return
+	}
+
+	permission, err := app.GetServices().BoardService.GetUserPermission(uint(boardID), userID)
+	if err != nil || permission != "owner" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "only owner can update members"})
+		return
+	}
+
+	targetUserID, err := strconv.ParseUint(c.Param("userId"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user id"})
+		return
+	}
+
+	var req UpdateMemberRequest
+	if err := c.BindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	err = app.GetServices().BoardService.UpdateMemberRole(uint(boardID), userID, uint(targetUserID), req.Role)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "member updated"})
+}
+
 func RegisterHandlers(app App) {
 	router := app.GetRouter()
 	router.GET("/api/sync-board", func(c *gin.Context) { wsHandler(app, c) })
 	router.POST("/api/boards", func(c *gin.Context) { createBoardHandler(app, c) })
 	router.GET("/api/boards", func(c *gin.Context) { getBoardsHandler(app, c) })
 	router.GET("/api/boards/:id", func(c *gin.Context) { getBoardHandler(app, c) })
+	router.GET("/api/boards/:id/access", func(c *gin.Context) { getBoardAccessHandler(app, c) })
+	router.GET("/api/boards/:id/members", func(c *gin.Context) { getBoardMembersHandler(app, c) })
+	router.POST("/api/boards/:id/members", func(c *gin.Context) { addBoardMemberHandler(app, c) })
+	router.PATCH("/api/boards/:id/members/:userId", func(c *gin.Context) { updateBoardMemberHandler(app, c) })
+	router.DELETE("/api/boards/:id/members/:userId", func(c *gin.Context) { removeBoardMemberHandler(app, c) })
 	router.PATCH("/api/boards/:id", func(c *gin.Context) { updateBoardHandler(app, c) })
 	router.POST("/api/boards/:id/tags", func(c *gin.Context) { addTagsHandler(app, c) })
 	router.DELETE("/api/boards/:id", func(c *gin.Context) { deleteBoardHandler(app, c) })

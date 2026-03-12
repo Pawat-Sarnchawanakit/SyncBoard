@@ -2,6 +2,7 @@ package front
 
 import (
 	"net/http"
+	"strconv"
 	"sync-board/handlers/auth"
 	"sync-board/services"
 
@@ -29,9 +30,47 @@ func RegisterHandlers(app App) {
 		c.HTML(http.StatusOK, "myboards.html", gin.H{})
 	})
 	router.GET("/board/:id", func(c *gin.Context) {
+		authenticated := auth.IsAuthenticated(app, c)
+		if !authenticated {
+			c.Redirect(http.StatusTemporaryRedirect, "/login")
+			return
+		}
+
+		boardID, err := strconv.ParseUint(c.Param("id"), 10, 32)
+		if err != nil {
+			c.HTML(http.StatusBadRequest, "board.html", gin.H{
+				"Authenticated": false,
+				"BoardId":       "",
+				"Permission":    "",
+			})
+			return
+		}
+
+		token, _ := c.Cookie("tk")
+		userID, err := app.GetServices().AuthenticationService.VerifyToken(token)
+		if err != nil {
+			c.Redirect(http.StatusTemporaryRedirect, "/login")
+			return
+		}
+
+		board, err := app.GetServices().BoardService.GetBoard(uint(boardID))
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"message": err.Error(),
+			})
+			return
+		}
+
+		permission, err := app.GetServices().BoardService.GetUserPermission(uint(boardID), userID)
+		if err != nil {
+			permission = ""
+		}
+
 		c.HTML(http.StatusOK, "board.html", gin.H{
-			"Authenticated": auth.IsAuthenticated(app, c),
-			"BoardId": c.Param("id"),
+			"Authenticated": true,
+			"BoardId":       c.Param("id"),
+			"BoardTitle":    board.Title,
+			"Permission":    permission,
 		})
 	})
 	router.GET("/signup", func(c *gin.Context) {

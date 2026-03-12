@@ -143,3 +143,15 @@ func (cur *AuthenticationService) GetUserByID(id uint) (*models.User, error) {
 	}
 	return &user, nil
 }
+
+func (cur *AuthenticationService) SearchUsers(query string, limit int) ([]models.User, error) {
+	datastore := cur.app.GetDatastore()
+	var users []models.User
+	if limit <= 0 {
+		limit = 10
+	}
+	if err := datastore.GormDB.Where("username LIKE ?", "%"+query+"%").Limit(limit).Find(&users).Error; err != nil {
+		return nil, err
+	}
+	return users, nil
+}

@@ -7,17 +7,298 @@
   <style>
     :root {
       --toolbar-h: 110px;
+      --topbar-h: 50px;
     }
     * { box-sizing: border-box; }
     html, body { height: 100%; margin: 0; padding: 0; background: #fff; }
 
+    .topbar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: var(--topbar-h);
+      background: rgba(255, 255, 255, 0.98);
+      border-bottom: 1px solid #eee;
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      gap: 12px;
+      z-index: 100;
+    }
+
+    .topbar-btn {
+      padding: 6px 12px;
+      border: 1px solid #ddd;
+      background: #fff;
+      border-radius: 6px;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 14px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .topbar-btn:hover {
+      background: #f5f5f5;
+    }
+
+    .topbar-title {
+      flex: 1;
+      font-size: 16px;
+      font-weight: 600;
+      color: #333;
+      text-align: center;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .topbar-right {
+      display: flex;
+      gap: 8px;
+    }
+
+    .permission-badge {
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .permission-badge.owner {
+      background: #e3f2fd;
+      color: #1976d2;
+    }
+
+    .permission-badge.editor {
+      background: #e8f5e9;
+      color: #388e3c;
+    }
+
+    .permission-badge.viewer {
+      background: #fff3e0;
+      color: #f57c00;
+    }
+
+    .no-permission {
+      display: flex;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: #f5f5f5;
+      z-index: 200;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+    }
+
+    .no-permission h2 {
+      color: #333;
+      margin: 0;
+    }
+
+    .no-permission p {
+      color: #666;
+      margin: 0;
+    }
+
+    .no-permission-btn {
+      padding: 10px 20px;
+      background: #007bff;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    .no-permission-btn:hover {
+      background: #0056b3;
+    }
+
+    .members-modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 300;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .members-modal.show {
+      display: flex;
+    }
+
+    .members-modal-content {
+      background: white;
+      border-radius: 8px;
+      width: 90%;
+      max-width: 450px;
+      max-height: 80vh;
+      overflow-y: auto;
+      padding: 20px;
+    }
+
+    .members-modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .members-modal-header h3 {
+      margin: 0;
+      font-size: 18px;
+    }
+
+    .close-modal {
+      background: none;
+      border: none;
+      font-size: 24px;
+      cursor: pointer;
+      color: #666;
+    }
+
+    .member-list {
+      margin-bottom: 20px;
+    }
+
+    .member-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px;
+      border-bottom: 1px solid #eee;
+    }
+
+    .member-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .member-name {
+      font-weight: 500;
+    }
+
+    .member-role {
+      font-size: 12px;
+      color: #666;
+    }
+
+    .member-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .member-action-btn {
+      padding: 4px 8px;
+      font-size: 12px;
+      border: 1px solid #ddd;
+      background: white;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .member-action-btn:hover {
+      background: #f5f5f5;
+    }
+
+    .member-action-btn.remove {
+      color: #dc3545;
+      border-color: #dc3545;
+    }
+
+    .member-action-btn.remove:hover {
+      background: #f8d7da;
+    }
+
+    .add-member-form {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .add-member-input {
+      flex: 1;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+
+    .add-member-select {
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+
+    .add-member-btn {
+      padding: 8px 16px;
+      background: #007bff;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    .add-member-btn:hover {
+      background: #0056b3;
+    }
+
+    .add-member-btn:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+
+    .user-suggestions {
+      position: absolute;
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      max-height: 150px;
+      overflow-y: auto;
+      width: calc(100% - 100px);
+      margin-left: 45px;
+      display: none;
+      z-index: 400;
+    }
+
+    .user-suggestions.show {
+      display: block;
+    }
+
+    .user-suggestion {
+      padding: 8px 12px;
+      cursor: pointer;
+    }
+
+    .user-suggestion:hover {
+      background: #f5f5f5;
+    }
+
+    .board-container {
+      display: block;
+    }
     
     .board {
       position: relative;
       width: 100vw;
-      height: 100vh;
+      height: calc(100vh - var(--topbar-h));
       overflow: scroll;
       background: #fff;
+      margin-top: var(--topbar-h);
     }
 
     
@@ -64,10 +345,15 @@
       background: #f0f0f8;
       border-color: #aaa;
     }
+    .tool-btn.disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
 
     .spacer { flex: 1 1 auto; }
 
     
+
     .color-palette { display: flex; align-items: center; gap: 6px; }
     .swatch {
       width: 28px; height: 28px; border-radius: 6px;
@@ -141,7 +427,7 @@
 
     .cursor-connected {
       position: fixed;
-      top: 10px;
+      top: 60px;
       right: 10px;
       background: #28a745;
       color: white;
@@ -155,6 +441,24 @@
       background: #dc3545;
     }
 
+    .copy-toast {
+      position: fixed;
+      top: 60px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #333;
+      color: white;
+      padding: 8px 16px;
+      border-radius: 4px;
+      font-size: 14px;
+      z-index: 1000;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .copy-toast.show {
+      opacity: 1;
+    }
     
     @media (max-width: 600px) {
       .toolbar { height: auto; padding: 8px; gap: 8px; }
@@ -163,462 +467,685 @@
 </head>
 <body>
 
-  <div id="connectionStatus" class="cursor-connected cursor-disconnected">Connecting...</div>
-  
-  <div class="board" id="board">
-    <canvas id="boardCanvas"></canvas>
-    <textarea id="textEditor" placeholder="Type text and press Enter"></textarea>
-    <div id="cursorsContainer"></div>
+  {{if eq .Permission ""}}
+  <div class="no-permission">
+    <h2>Access Denied</h2>
+    <p>You don't have permission to view this board.</p>
+    <button class="no-permission-btn" onclick="window.location.href='/myboards'">Go to My Boards</button>
   </div>
+  {{else}}
+  <h3>{{.Permission}}</h3>
+  <div class="board-container">
+    <div class="topbar" id="topbar">
+      <button class="topbar-btn" onclick="window.location.href='/myboards'">← Back</button>
+      <span class="topbar-title">{{.BoardTitle}}</span>
+      <div class="topbar-right">
+        <div style="display: flex;flex-direction: column;justify-content: center;">
+          <span class="permission-badge" id="permissionBadge"></span>
+        </div>
+        <button class="topbar-btn" id="shareBtn" onclick="copyShareLink()">Share</button>
+        <button class="topbar-btn" id="membersBtn" onclick="showMembersModal()" style="display:none;">Members</button>
+      </div>
+    </div>
 
-  
-  <div class="toolbar" aria-label="Drawing tools">
-    <button class="tool-btn" id="penBtn" title="Pen (draw)">Pen</button>
-    <button class="tool-btn" id="eraserBtn" title="Eraser">Eraser</button>
-    <button class="tool-btn" id="textBtn" title="Text">Text</button>
-
-    <div class="spacer"></div>
+    <div class="cursor-connected cursor-disconnected" id="connectionStatus">Connecting...</div>
+    <div class="copy-toast" id="copyToast">Link copied to clipboard!</div>
+    
+    <div class="board" id="board">
+      <canvas id="boardCanvas"></canvas>
+      <textarea id="textEditor" placeholder="Type text and press Enter"></textarea>
+      <div id="cursorsContainer"></div>
+    </div>
 
     
-    <div class="color-palette" id="colorPalette" aria-label="Color palette"></div>
+    <div class="toolbar" aria-label="Drawing tools" id="toolbar">
+      <button class="tool-btn" id="penBtn" title="Pen (draw)">Pen</button>
+      <button class="tool-btn" id="eraserBtn" title="Eraser">Eraser</button>
+      <button class="tool-btn" id="textBtn" title="Text">Text</button>
 
-    
-    <div class="size-selector" id="sizeSelector" aria-label="Marker size"></div>
+      <div class="spacer"></div>
 
-    
-    <button class="tool-btn" id="clearBtn" title="Clear canvas">Clear</button>
+      
+      <div class="color-palette" id="colorPalette" aria-label="Color palette"></div>
+
+      
+      <div class="size-selector" id="sizeSelector" aria-label="Marker size"></div>
+
+      
+      <button class="tool-btn" id="clearBtn" title="Clear canvas">Clear</button>
+    </div>
   </div>
+  <div class="members-modal" id="membersModal">
+    <div class="members-modal-content">
+      <div class="members-modal-header">
+        <h3>Board Members</h3>
+        <button class="close-modal" onclick="hideMembersModal()">&times;</button>
+      </div>
+      <div class="member-list" id="memberList"></div>
+      <div class="add-member-form" style="position: relative;">
+        <input type="text" class="add-member-input" id="addMemberInput" placeholder="Search username..." oninput="searchUsers(this.value)" autocomplete="off">
+        <select class="add-member-select" id="addMemberRole">
+          <option value="viewer">Viewer</option>
+          <option value="editor">Editor</option>
+        </select>
+        <button class="add-member-btn" id="addMemberBtn" onclick="addMember()">Add</button>
+        <div class="user-suggestions" id="userSuggestions"></div>
+      </div>
+    </div>
+  </div>
+  {{end}}
 
   <script>
-    (function() {
-      const canvas = document.getElementById('boardCanvas');
-      const ctx = canvas.getContext('2d', { alpha: false }); 
-      const board = document.getElementById('board');
-      const textEditor = document.getElementById('textEditor');
-      const cursorsContainer = document.getElementById('cursorsContainer');
-      const connectionStatus = document.getElementById('connectionStatus');
+    let ws;
+    let userPermission = "{{.Permission}}";
+    let boardId = "{{.BoardId}}";
+    let selectedUserId = null;
+    // Check if no access
+    if (userPermission !== "")
+      initBoard();
 
-      
-      let drawing = false;
-      let currentColor = '#000000';
-      let brushSize = 6;
-      let tool = 'pen'; 
-      let lastX = 0, lastY = 0;
+    function initBoard() {
+      const badge = document.getElementById('permissionBadge');
+      badge.textContent = userPermission.charAt(0).toUpperCase() + userPermission.slice(1);
+      badge.className = 'permission-badge ' + userPermission;
 
-      let ws = null;
-      let boardId = null;
-      let remoteCursors = {};
+      if (userPermission === 'owner')
+        document.getElementById('membersBtn').style.display = 'inline-flex';
 
-      
-      const colors = [
-        '#000000','#333333','#9b9b9b','#ffffff',
-        '#e74c3c','#e67e22','#f1c40f','#2ecc71','#1abc9c',
-        '#3498db','#9b59b6','#e84393','#7f8c8d','#16a085'
-      ];
-      const sizes = [2, 4, 6, 8, 12, 16];
+      if (userPermission === 'viewer') {
+        document.getElementById('penBtn').classList.add('disabled');
+        document.getElementById('eraserBtn').classList.add('disabled');
+        document.getElementById('textBtn').classList.add('disabled');
+        document.getElementById('clearBtn').classList.add('disabled');
+      }
 
-      
-      const colorPalette = document.getElementById('colorPalette');
-      colors.forEach((c, idx) => {
-        const btn = document.createElement('button');
-        btn.className = 'swatch';
-        btn.style.background = c;
-        btn.setAttribute('data-color', c);
-        btn.style.outline = 'none';
-        btn.addEventListener('click', () => {
-          currentColor = c;
-          
-          document.querySelectorAll('.swatch').forEach(el => el.classList.remove('selected'));
-          btn.classList.add('selected');
-          if (tool === 'pen') {
-            
+      if (userPermission === 'viewer' || userPermission === 'editor') {
+        document.getElementById('shareBtn').style.display = 'none';
+      }
+
+      initCanvas();
+    }
+
+    async function loadMembers() {
+      try {
+        const response = await fetch('/api/boards/' + boardId + '/members');
+        if (response.ok) {
+          const data = await response.json();
+          renderMembers(data.members);
+        }
+      } catch (err) {
+        console.error('Failed to load members:', err);
+      }
+    }
+
+    function renderMembers(members) {
+      const list = document.getElementById('memberList');
+      list.innerHTML = members.map(m => `
+        <div class="member-item">
+          <div class="member-info">
+            <span class="member-name">${escapeHtml(m.username)}</span>
+            <span class="member-role">${m.role === 'owner' ? 'Owner' : m.role === 'editor' ? 'Editor' : 'Viewer'}</span>
+          </div>
+          ${m.role !== 'owner' ? `
+            <div class="member-actions">
+              <button class="member-action-btn" onclick="changeRole(${m.userId}, '${m.role === 'editor' ? 'viewer' : 'editor'}')">
+                ${m.role === 'editor' ? 'Make Viewer' : 'Make Editor'}
+              </button>
+              <button class="member-action-btn remove" onclick="removeMember(${m.userId})">Remove</button>
+            </div>
+          ` : ''}
+        </div>
+      `).join('');
+    }
+
+    async function searchUsers(query) {
+      if (query.length < 1) {
+        document.getElementById('userSuggestions').classList.remove('show');
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/users/search?q=' + encodeURIComponent(query));
+        if (response.ok) {
+          const data = await response.json();
+          const suggestions = document.getElementById('userSuggestions');
+          if (data.users.length > 0) {
+            suggestions.innerHTML = data.users.map(u => 
+              '<div class="user-suggestion" onclick="selectUser(' + u.id + ', \'' + escapeHtml(u.username) + '\')">' + escapeHtml(u.username) + '</div>'
+            ).join('');
+            suggestions.classList.add('show');
+          } else {
+            suggestions.classList.remove('show');
           }
-        });
-        colorPalette.appendChild(btn);
-      });
+        }
+      } catch (err) {
+        console.error('Failed to search users:', err);
+      }
+    }
 
-      
-      const firstSwatch = colorPalette.querySelector('.swatch');
-      if (firstSwatch) {
-        firstSwatch.classList.add('selected');
+    function selectUser(userId, username) {
+      selectedUserId = userId;
+      document.getElementById('addMemberInput').value = username;
+      document.getElementById('userSuggestions').classList.remove('show');
+    }
+
+    async function addMember() {
+      const username = document.getElementById('addMemberInput').value.trim();
+      const role = document.getElementById('addMemberRole').value;
+
+      if (!username || !selectedUserId) {
+        return;
       }
 
-      
-      const sizeSelector = document.getElementById('sizeSelector');
-      sizes.forEach((sz, i) => {
-        const btn = document.createElement('button');
-        btn.className = 'size-btn';
-        btn.setAttribute('data-size', sz);
-        btn.title = 'Size ' + sz + 'px';
-        
-        const dot = document.createElement('span');
-        dot.style.display = 'inline-block';
-        dot.style.width = sz + 'px';
-        dot.style.height = sz + 'px';
-        dot.style.borderRadius = '50%';
-        dot.style.background = '#000';
-        btn.appendChild(dot);
+      const btn = document.getElementById('addMemberBtn');
+      btn.disabled = true;
+      btn.textContent = 'Adding...';
 
-        btn.addEventListener('click', () => {
-          brushSize = sz;
-          
-          document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('active'));
-          btn.classList.add('active');
+      try {
+        const response = await fetch('/api/boards/' + boardId + '/members', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: username, role: role })
         });
 
-        
-        if (sz === brushSize) btn.classList.add('active');
-        sizeSelector.appendChild(btn);
-      });
-
-      
-      const penBtn = document.getElementById('penBtn');
-      const eraserBtn = document.getElementById('eraserBtn');
-      const textBtn = document.getElementById('textBtn');
-      const clearBtn = document.getElementById('clearBtn');
-
-      function setTool(t) {
-        if(t !== 'text') textEditor.style.display = 'none';
-        tool = t;
-        document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
-        if (t === 'pen') penBtn.classList.add('active');
-        if (t === 'eraser') eraserBtn.classList.add('active');
-        if (t === 'text') textBtn.classList.add('active');
-      }
-
-      penBtn.addEventListener('click', () => setTool('pen'));
-      eraserBtn.addEventListener('click', () => setTool('eraser'));
-      textBtn.addEventListener('click', () => setTool('text'));
-
-      
-      setTool('pen');
-
-      
-      function getPos(evt) {
-        const rect = canvas.getBoundingClientRect();
-        let x, y;
-        if (evt.touches && evt.touches.length) {
-          x = evt.touches[0].clientX - rect.left;
-          y = evt.touches[0].clientY - rect.top;
+        if (response.ok) {
+          document.getElementById('addMemberInput').value = '';
+          selectedUserId = null;
+          loadMembers();
         } else {
-          x = evt.clientX - rect.left;
-          y = evt.clientY - rect.top;
+          const data = await response.json();
+          alert(data.error || 'Failed to add member');
         }
-        return { x, y };
+      } catch (err) {
+        alert('Failed to add member');
       }
 
-      
-      function start(x, y, isRemote = false) {
-        drawing = true;
-        lastX = x;
-        lastY = y;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        ctx.globalCompositeOperation = 'source-over';
-        ctx.strokeStyle = currentColor;
-        ctx.fillStyle = currentColor;
-        ctx.lineWidth = brushSize;
-        if (tool === 'eraser') {
-          ctx.lineWidth = brushSize * 4;
-          ctx.fillStyle = "#fff";
-          ctx.strokeStyle = "#fff";
+      btn.disabled = false;
+      btn.textContent = 'Add';
+    }
+
+    async function removeMember(userId) {
+      if (!confirm('Remove this member from the board?')) return;
+
+      try {
+        const response = await fetch('/api/boards/' + boardId + '/members/' + userId, {
+          method: 'DELETE'
+        });
+        if (response.ok) {
+          loadMembers();
+        } else {
+          const data = await response.json();
+          alert(data.error || 'Failed to remove member');
         }
+      } catch (err) {
+        alert('Failed to remove member');
       }
+    }
 
-      function drawTo(x, y, isRemote = false) {
-        if (!drawing) return;
-        ctx.beginPath();
-        ctx.moveTo(lastX, lastY);
-        ctx.lineTo(x, y);
-        ctx.stroke();
-        lastX = x;
-        lastY = y;
-      }
-
-      function end(isRemote = false) {
-        drawing = false;
-      }
-
-      
-      function sendDraw(x1, y1, x2, y2) {
-        if (ws && ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({
-            type: 'draw',
-            x1: x1,
-            y1: y1,
-            x2: x2,
-            y2: y2,
-            color: tool === 'eraser' ? '#ffffff' : currentColor,
-            size: brushSize,
-            tool: tool
-          }));
+    async function changeRole(userId, newRole) {
+      try {
+        const response = await fetch('/api/boards/' + boardId + '/members/' + userId, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ role: newRole })
+        });
+        if (response.ok) {
+          loadMembers();
+        } else {
+          const data = await response.json();
+          alert(data.error || 'Failed to update role');
         }
+      } catch (err) {
+        alert('Failed to update role');
       }
+    }
 
-      
-      function sendText(x, y, text) {
-        if (ws && ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({
-            type: 'text',
-            x: x,
-            y: y,
-            text: text,
-            color: currentColor,
-            size: brushSize
-          }));
-        }
-      }
+    function showMembersModal() {
+      document.getElementById('membersModal').classList.add('show');
+      loadMembers();
+    }
 
-      
-      function sendCursor(x, y) {
-        if (ws && ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({
-            type: 'cursor',
-            payload: {
-              x: x,
-              y: y,
-              color: currentColor
-            },
-          }));
-        }
-      }
+    function hideMembersModal() {
+      document.getElementById('membersModal').classList.remove('show');
+    }
 
-      
-      function sendClear() {
-        if (ws && ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({
-            type: 'clear'
-          }));
-        }
-      }
-
-      
-      let cursorThrottle = null;
-      function throttledSendCursor(x, y) {
-        if (cursorThrottle) return;
-        cursorThrottle = setTimeout(() => {
-          cursorThrottle = null;
-        }, 50);
-        sendCursor(x, y);
-      }
-
-      
-      canvas.addEventListener('mousedown', (e) => {
-        if (tool === 'text') {
-          handleTextPlacement(e);
-          return;
-        }
-        const p = getPos(e);
-        start(p.x, p.y);
+    function copyShareLink() {
+      const link = window.location.origin + '/board/' + boardId;
+      navigator.clipboard.writeText(link).then(() => {
+        const toast = document.getElementById('copyToast');
+        toast.classList.add('show');
+        setTimeout(() => toast.classList.remove('show'), 2000);
       });
-      canvas.addEventListener('mousemove', (e) => {
-        const p = getPos(e);
-        throttledSendCursor(p.x, p.y);
-        if (drawing) {
-          sendDraw(lastX, lastY, p.x, p.y);
-          drawTo(p.x, p.y);
-        }
-      });
-      window.addEventListener('mouseup', () => {
-        end();
-      });
+    }
 
-      
-      canvas.addEventListener('touchstart', (e) => {
-        if (tool === 'text') {
-          handleTextPlacement(e.touches[0]);
-          return;
-        }
-        const p = getPos(e);
-        start(p.x, p.y);
-        e.preventDefault();
-      }, { passive: false });
-      canvas.addEventListener('touchmove', (e) => {
-        const p = getPos(e);
-        throttledSendCursor(p.x, p.y);
-        if (drawing) {
-          sendDraw(lastX, lastY, p.x, p.y);
-          drawTo(p.x, p.y);
-        }
-        e.preventDefault();
-      }, { passive: false });
-      window.addEventListener('touchend', () => {
-        end();
-      });
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
 
-      
-      function handleTextPlacement(eventOrTouch) {
-        const rect = canvas.getBoundingClientRect();
-        const x = (eventOrTouch.clientX || 0) - rect.left;
-        const y = (eventOrTouch.clientY || 0) - rect.top;
-
-        
-        textEditor.style.display = 'block';
-        textEditor.style.left = x + 'px';
-        textEditor.style.top = y + 'px';
-        textEditor.value = '';
-        textEditor.focus();
+    document.addEventListener('click', function(e) {
+      if (!e.target.closest('.add-member-form')) {
+        document.getElementById('userSuggestions').classList.remove('show');
       }
-
-      
-      textEditor.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-          e.preventDefault();
-          const text = textEditor.value;
-          const x = parseInt(textEditor.style.left, 10) || 0;
-          const y = parseInt(textEditor.style.top, 10) || 0;
-          finalizeText(text, x, y);
-          sendText(x, y, text);
-          textEditor.style.display = 'none';
-          textEditor.value = '';
-        }
     });
 
-      function finalizeText(text, x, y, isRemote = false, remoteColor = null, remoteSize = null) {
-        if (!text) return;
+    // Canvas and drawing code
+    const canvas = document.getElementById('boardCanvas');
+    const ctx = canvas.getContext('2d', { alpha: false }); 
+    const board = document.getElementById('board');
+    const textEditor = document.getElementById('textEditor');
+    const cursorsContainer = document.getElementById('cursorsContainer');
+    const connectionStatus = document.getElementById('connectionStatus');
+
+    
+    let drawing = false;
+    let currentColor = '#000000';
+    let brushSize = 6;
+    let tool = 'pen'; 
+    let lastX = 0, lastY = 0;
+
+    let remoteCursors = {};
+
+    
+    const colors = [
+      '#000000','#333333','#9b9b9b','#ffffff',
+      '#e74c3c','#e67e22','#f1c40f','#2ecc71','#1abc9c',
+      '#3498db','#9b59b6','#e84393','#7f8c8d','#16a085'
+    ];
+    const sizes = [2, 4, 6, 8, 12, 16];
+
+    
+    const colorPalette = document.getElementById('colorPalette');
+    colors.forEach((c, idx) => {
+      const btn = document.createElement('button');
+      btn.className = 'swatch';
+      btn.style.background = c;
+      btn.setAttribute('data-color', c);
+      btn.style.outline = 'none';
+      btn.addEventListener('click', () => {
+        currentColor = c;
         
-        const fontSize = Math.max(12, (remoteSize || brushSize) * 2);
-        ctx.save();
-        ctx.fillStyle = remoteColor || currentColor;
-        ctx.font = fontSize + 'px sans-serif';
-        const lines = text.split('\n');
-        const lineHeight = fontSize * 1.2;
-        for (let i = 0; i < lines.length; i++) {
-          ctx.fillText(lines[i], x, y + i * lineHeight);
-        }
-        ctx.restore();
-      }
+        document.querySelectorAll('.swatch').forEach(el => el.classList.remove('selected'));
+        btn.classList.add('selected');
+      });
+      colorPalette.appendChild(btn);
+    });
 
+    
+    const firstSwatch = colorPalette.querySelector('.swatch');
+    if (firstSwatch) {
+      firstSwatch.classList.add('selected');
+    }
+
+    
+    const sizeSelector = document.getElementById('sizeSelector');
+    sizes.forEach((sz, i) => {
+      const btn = document.createElement('button');
+      btn.className = 'size-btn';
+      btn.setAttribute('data-size', sz);
+      btn.title = 'Size ' + sz + 'px';
       
-      function clearCanvas() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = '#fff';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-      }
+      const dot = document.createElement('span');
+      dot.style.display = 'inline-block';
+      dot.style.width = sz + 'px';
+      dot.style.height = sz + 'px';
+      dot.style.borderRadius = '50%';
+      dot.style.background = '#000';
+      btn.appendChild(dot);
 
-      canvas.width = 1920;
-      canvas.height = 1080;
-      const dpr = window.devicePixelRatio || 1;
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      clearCanvas();
-
-      
-      clearBtn.addEventListener('click', () => {
-        clearCanvas();
-        sendClear();
+      btn.addEventListener('click', () => {
+        brushSize = sz;
+        
+        document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
       });
 
       
-      function connectWebSocket() {
-        boardId = "{{.BoardId}}";
-        
-        if (!boardId) {
-          connectionStatus.textContent = 'No board ID';
-          return;
-        }
+      if (sz === brushSize) btn.classList.add('active');
+      sizeSelector.appendChild(btn);
+    });
 
-        const wsUrl = 'ws://' + window.location.host + '/api/sync-board?board_id=' + boardId;
-        ws = new WebSocket(wsUrl);
+    
+    const penBtn = document.getElementById('penBtn');
+    const eraserBtn = document.getElementById('eraserBtn');
+    const textBtn = document.getElementById('textBtn');
+    const clearBtn = document.getElementById('clearBtn');
 
-        ws.onopen = function() {
-          connectionStatus.textContent = 'Connected';
-          connectionStatus.classList.remove('cursor-disconnected');
-        };
+    function setTool(t) {
+      if(t !== 'text') textEditor.style.display = 'none';
+      tool = t;
+      document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
+      if (t === 'pen') penBtn.classList.add('active');
+      if (t === 'eraser') eraserBtn.classList.add('active');
+      if (t === 'text') textBtn.classList.add('active');
+    }
 
-        ws.onclose = function() {
-          connectionStatus.textContent = 'Disconnected - Reconnecting...';
-          connectionStatus.classList.add('cursor-disconnected');
-          setTimeout(connectWebSocket, 2000);
-        };
+    penBtn.addEventListener('click', () => { if (userPermission !== 'viewer') setTool('pen'); });
+    eraserBtn.addEventListener('click', () => { if (userPermission !== 'viewer') setTool('eraser'); });
+    textBtn.addEventListener('click', () => { if (userPermission !== 'viewer') setTool('text'); });
 
-        ws.onerror = function() {
-          connectionStatus.textContent = 'Connection error';
-        };
+    
+    setTool('pen');
 
-        ws.onmessage = function(event) {
-          try {
-            const msg = JSON.parse(event.data);
-            handleMessage(msg);
-          } catch (e) {
-            console.error('Failed to parse message:', e);
-          }
-        };
+    
+    function getPos(evt) {
+      const rect = canvas.getBoundingClientRect();
+      let x, y;
+      if (evt.touches && evt.touches.length) {
+        x = evt.touches[0].clientX - rect.left;
+        y = evt.touches[0].clientY - rect.top;
+      } else {
+        x = evt.clientX - rect.left;
+        y = evt.clientY - rect.top;
       }
+      return { x, y };
+    }
 
-      function handleMessage(msg) {
-        switch (msg.type) {
-          case 'draw':
-            handleDraw(msg);
-            break;
-          case 'text':
-            handleText(msg);
-            break;
-          case 'cursor':
-            handleCursor(msg);
-            break;
-          case 'clear':
-            clearCanvas();
-            break;
-        }
+    
+    function start(x, y, isRemote = false) {
+      drawing = true;
+      lastX = x;
+      lastY = y;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.strokeStyle = currentColor;
+      ctx.fillStyle = currentColor;
+      ctx.lineWidth = brushSize;
+      if (tool === 'eraser') {
+        ctx.lineWidth = brushSize * 4;
+        ctx.fillStyle = "#fff";
+        ctx.strokeStyle = "#fff";
       }
+    }
 
-      function handleDraw(msg) {
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        ctx.globalCompositeOperation = 'source-over';
-        ctx.strokeStyle = msg.color;
-        ctx.fillStyle = msg.color;
-        ctx.lineWidth = msg.size;
-        
-        ctx.beginPath();
-        ctx.moveTo(msg.x1, msg.y1);
-        ctx.lineTo(msg.x2, msg.y2);
-        ctx.stroke();
-      }
+    function drawTo(x, y, isRemote = false) {
+      if (!drawing) return;
+      ctx.beginPath();
+      ctx.moveTo(lastX, lastY);
+      ctx.lineTo(x, y);
+      ctx.stroke();
+      lastX = x;
+      lastY = y;
+    }
 
-      function handleText(msg) {
-        finalizeText(msg.text, msg.x, msg.y, true, msg.color, msg.size);
-      }
+    function end(isRemote = false) {
+      drawing = false;
+    }
 
-      function handleCursor(msg) {
-        if (!msg.username) return;
-        
-        let cursorEl = remoteCursors[msg.username];
-        if (!cursorEl) {
-          cursorEl = document.createElement('div');
-          cursorEl.className = 'remote-cursor';
-          
-          const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-          svg.setAttribute('viewBox', '0 0 24 24');
-          svg.style.fill = msg.color || '#e74c3c';
-          svg.innerHTML = '<path d="M5.5 3.21V20.8c0 .45.54.67.85.35l4.86-4.86a.5.5 0 0 1 .35-.15h6.87c.48 0 .72-.58.38-.92L5.88 2.85a.5.5 0 0 0-.38.36z"/>';
-          cursorEl.appendChild(svg);
-          
-          const label = document.createElement('div');
-          label.className = 'remote-cursor-label';
-          label.textContent = msg.username;
-          cursorEl.appendChild(label);
-          
-          cursorsContainer.appendChild(cursorEl);
-          remoteCursors[msg.username] = cursorEl;
-        }
-        cursorEl.querySelector("svg").style.fill = msg.color || '#e74c3c';
-        cursorEl.style.left = msg.x + 'px';
-        cursorEl.style.top = msg.y + 'px';
-        cursorEl.style.opacity = '0.7';
+    
+    function sendDraw(x1, y1, x2, y2) {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+          type: 'draw',
+          x1: x1,
+          y1: y1,
+          x2: x2,
+          y2: y2,
+          color: tool === 'eraser' ? '#ffffff' : currentColor,
+          size: brushSize,
+          tool: tool
+        }));
       }
+    }
+
+    
+    function sendText(x, y, text) {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+          type: 'text',
+          x: x,
+          y: y,
+          text: text,
+          color: currentColor,
+          size: brushSize
+        }));
+      }
+    }
+
+    
+    function sendCursor(x, y) {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+          type: 'cursor',
+          payload: {
+            x: x,
+            y: y,
+            color: currentColor
+          },
+        }));
+      }
+    }
+
+    
+    function sendClear() {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+          type: 'clear'
+        }));
+      }
+    }
+
+    
+    let cursorThrottle = null;
+    function throttledSendCursor(x, y) {
+      if (cursorThrottle) return;
+      cursorThrottle = setTimeout(() => {
+        cursorThrottle = null;
+      }, 50);
+      sendCursor(x, y);
+    }
+
+    
+    canvas.addEventListener('mousedown', (e) => {
+      if (userPermission === 'viewer') return;
+      if (tool === 'text') {
+        handleTextPlacement(e);
+        return;
+      }
+      const p = getPos(e);
+      start(p.x, p.y);
+    });
+    canvas.addEventListener('mousemove', (e) => {
+      const p = getPos(e);
+      throttledSendCursor(p.x, p.y);
+      if (drawing) {
+        sendDraw(lastX, lastY, p.x, p.y);
+        drawTo(p.x, p.y);
+      }
+    });
+    window.addEventListener('mouseup', () => {
+      end();
+    });
+
+    
+    canvas.addEventListener('touchstart', (e) => {
+      if (userPermission === 'viewer') return;
+      if (tool === 'text') {
+        handleTextPlacement(e.touches[0]);
+        return;
+      }
+      const p = getPos(e);
+      start(p.x, p.y);
+      e.preventDefault();
+    }, { passive: false });
+    canvas.addEventListener('touchmove', (e) => {
+      const p = getPos(e);
+      throttledSendCursor(p.x, p.y);
+      if (drawing) {
+        sendDraw(lastX, lastY, p.x, p.y);
+        drawTo(p.x, p.y);
+      }
+      e.preventDefault();
+    }, { passive: false });
+    window.addEventListener('touchend', () => {
+      end();
+    });
+
+    
+    function handleTextPlacement(eventOrTouch) {
+      const rect = canvas.getBoundingClientRect();
+      const x = (eventOrTouch.clientX || 0) - rect.left;
+      const y = (eventOrTouch.clientY || 0) - rect.top;
 
       
-      setInterval(function() {
-        for (const username in remoteCursors) {
-          const cursorEl = remoteCursors[username];
-          cursorEl.style.opacity = '0.5';
+      textEditor.style.display = 'block';
+      textEditor.style.left = x + 'px';
+      textEditor.style.top = y + 'px';
+      textEditor.value = '';
+      textEditor.focus();
+    }
+
+    
+    textEditor.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        const text = textEditor.value;
+        const x = parseInt(textEditor.style.left, 10) || 0;
+        const y = parseInt(textEditor.style.top, 10) || 0;
+        finalizeText(text, x, y);
+        sendText(x, y, text);
+        textEditor.style.display = 'none';
+        textEditor.value = '';
+      }
+    });
+
+    function finalizeText(text, x, y, isRemote = false, remoteColor = null, remoteSize = null) {
+      if (!text) return;
+      
+      const fontSize = Math.max(12, (remoteSize || brushSize) * 2);
+      ctx.save();
+      ctx.fillStyle = remoteColor || currentColor;
+      ctx.font = fontSize + 'px sans-serif';
+      const lines = text.split('\n');
+      const lineHeight = fontSize * 1.2;
+      for (let i = 0; i < lines.length; i++) {
+        ctx.fillText(lines[i], x, y + i * lineHeight);
+      }
+      ctx.restore();
+    }
+
+    
+    function clearCanvas() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    canvas.width = 1920;
+    canvas.height = 1080;
+    const dpr = window.devicePixelRatio || 1;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    clearCanvas();
+
+    
+    clearBtn.addEventListener('click', () => {
+      if (userPermission === 'viewer') return;
+      clearCanvas();
+      sendClear();
+    });
+
+    function initCanvas() {
+      if (!boardId) return;
+      const wsUrl = 'ws://' + window.location.host + '/api/sync-board?board_id=' + boardId;
+      ws = new WebSocket(wsUrl);
+
+      ws.onopen = function() {
+        connectionStatus.textContent = 'Connected';
+        connectionStatus.classList.remove('cursor-disconnected');
+      };
+
+      ws.onclose = function() {
+        connectionStatus.textContent = 'Disconnected - Reconnecting...';
+        connectionStatus.classList.add('cursor-disconnected');
+        setTimeout(initCanvas, 2000);
+      };
+
+      ws.onerror = function() {
+        connectionStatus.textContent = 'Connection error';
+      };
+
+      ws.onmessage = function(event) {
+        try {
+          const msg = JSON.parse(event.data);
+          handleMessage(msg);
+        } catch (e) {
+          console.error('Failed to parse message:', e);
         }
-      }, 3000);
+      };
+    }
 
-      connectWebSocket();
+    function handleMessage(msg) {
+      switch (msg.type) {
+        case 'draw':
+          handleDraw(msg);
+          break;
+        case 'text':
+          handleText(msg);
+          break;
+        case 'cursor':
+          handleCursor(msg);
+          break;
+        case 'clear':
+          clearCanvas();
+          break;
+      }
+    }
 
-    })();
+    function handleDraw(msg) {
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.strokeStyle = msg.color;
+      ctx.fillStyle = msg.color;
+      ctx.lineWidth = msg.size;
+      
+      ctx.beginPath();
+      ctx.moveTo(msg.x1, msg.y1);
+      ctx.lineTo(msg.x2, msg.y2);
+      ctx.stroke();
+    }
+
+    function handleText(msg) {
+      finalizeText(msg.text, msg.x, msg.y, true, msg.color, msg.size);
+    }
+
+    function handleCursor(msg) {
+      if (!msg.username) return;
+      
+      let cursorEl = remoteCursors[msg.username];
+      if (!cursorEl) {
+        cursorEl = document.createElement('div');
+        cursorEl.className = 'remote-cursor';
+        
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('viewBox', '0 0 24 24');
+        svg.style.fill = msg.color || '#e74c3c';
+        svg.innerHTML = '<path d="M5.5 3.21V20.8c0 .45.54.67.85.35l4.86-4.86a.5.5 0 0 1 .35-.15h6.87c.48 0 .72-.58.38-.92L5.88 2.85a.5.5 0 0 0-.38.36z"/>';
+        cursorEl.appendChild(svg);
+        
+        const label = document.createElement('div');
+        label.className = 'remote-cursor-label';
+        label.textContent = msg.username;
+        cursorEl.appendChild(label);
+        
+        cursorsContainer.appendChild(cursorEl);
+        remoteCursors[msg.username] = cursorEl;
+      }
+      cursorEl.querySelector("svg").style.fill = msg.color || '#e74c3c';
+      cursorEl.style.left = msg.x + 'px';
+      cursorEl.style.top = msg.y + 'px';
+      cursorEl.style.opacity = '0.7';
+    }
+
+    
+    setInterval(function() {
+      for (const username in remoteCursors) {
+        const cursorEl = remoteCursors[username];
+        cursorEl.style.opacity = '0.5';
+      }
+    }, 3000);
   </script>
 </body>
 </html>

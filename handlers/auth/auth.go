@@ -79,6 +79,31 @@ func logoutHandler(app App, c *gin.Context) {
 	c.SetCookie("tk", "", -1, "/", app.GetHost(), true, true)
 }
 
+func searchUsersHandler(app App, c *gin.Context) {
+	query := c.Query("q")
+	if query == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "query required"})
+		return
+	}
+
+	users, err := app.GetServices().AuthenticationService.SearchUsers(query, 10)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	type userResult struct {
+		ID       uint   `json:"id"`
+		Username string `json:"username"`
+	}
+	var results []userResult
+	for _, u := range users {
+		results = append(results, userResult{ID: u.ID, Username: u.Username})
+	}
+
+	c.JSON(http.StatusOK, gin.H{"users": results})
+}
+
 type HandlerFunc func(app App, c *gin.Context)
 
 func RequireAuth(app App, handler HandlerFunc) gin.HandlerFunc {
@@ -96,4 +121,5 @@ func RegisterHandlers(app App) {
 	router.POST("/api/signup", func(c *gin.Context) { signUpHandler(app, c) })
 	router.POST("/api/login", func(c *gin.Context) { loginHandler(app, c) })
 	router.POST("/api/logout", func(c *gin.Context) { logoutHandler(app, c) })
+	router.GET("/api/users/search", func(c *gin.Context) { searchUsersHandler(app, c) })
 }

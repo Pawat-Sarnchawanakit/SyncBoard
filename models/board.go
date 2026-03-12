@@ -9,3 +9,16 @@ type Board struct {
 	Tags        string `gorm:"size:500"`
 	OwnerID     uint   `gorm:"not null"`
 }
+
+const (
+	RoleOwner  = "owner"
+	RoleEditor = "editor"
+	RoleViewer = "viewer"
+)
+
+type BoardMember struct {
+	gorm.Model
+	BoardID uint   `gorm:"not null;index"`
+	UserID  uint   `gorm:"not null;index"`
+	Role    string `gorm:"size:20;not null;default:'viewer'"`
+}
