@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"image"
-	"image/color"
 	"image/draw"
+	"os"
 	"strings"
 	"sync"
 	"sync-board/models"
@@ -14,6 +14,8 @@ import (
 
 	"github.com/chai2010/webp"
 	"github.com/gorilla/websocket"
+	"github.com/tfriedel6/canvas"
+	"github.com/tfriedel6/canvas/backend/softwarebackend"
 )
 
 const (
@@ -31,24 +33,58 @@ type BoardService struct {
 	canvasManager *CanvasManager
 }
 
+type canvasData struct {
+	Backend *softwarebackend.SoftwareBackend
+	Canvas  *canvas.Canvas
+	Font    *canvas.Font
+}
+
 type CanvasManager struct {
-	canvases  map[uint]*image.RGBA
+	canvases  map[uint]*canvasData
 	clients   map[uint]int
+	font      *canvas.Font
 	mutex     sync.RWMutex
 	datastore *models.DataStore
 }
 
 func NewCanvasManager(datastore *models.DataStore) *CanvasManager {
 	cm := &CanvasManager{
-		canvases:  make(map[uint]*image.RGBA),
+		canvases:  make(map[uint]*canvasData),
 		clients:   make(map[uint]int),
+		font:      nil,
 		datastore: datastore,
 	}
 	go cm.periodicSave()
 	return cm
 }
 
-func (cm *CanvasManager) GetOrCreateCanvas(boardID uint) *image.RGBA {
+func (cm *CanvasManager) createCanvasData(boardID uint) *canvasData {
+	backend := softwarebackend.New(CanvasWidth, CanvasHeight)
+	cv := canvas.New(backend)
+
+	cv.SetFillStyle("#FFFFFF")
+	cv.FillRect(0, 0, float64(CanvasWidth), float64(CanvasHeight))
+
+	if cm.font == nil {
+		fontData, err := os.ReadFile("assets/open-sans.ttf")
+		if err != nil {
+			fmt.Printf("Failed to load font: %v\n", fontData)
+		} else {
+			cm.font, err = cv.LoadFont(fontData)
+			if err != nil {
+				fmt.Printf("Failed to load font into canvas: %v\n", err)
+			}
+		}
+	}
+
+	return &canvasData{
+		Backend: backend,
+		Canvas:  cv,
+		Font:    cm.font,
+	}
+}
+
+func (cm *CanvasManager) GetOrCreateCanvas(boardID uint) *canvasData {
 	cm.mutex.Lock()
 	defer cm.mutex.Unlock()
 
@@ -60,72 +96,96 @@ func (cm *CanvasManager) GetOrCreateCanvas(boardID uint) *image.RGBA {
 	if err := cm.datastore.GormDB.First(&board, boardID).Error; err == nil && len(board.Content) > 0 {
 		img, err := webp.Decode(bytes.NewReader(board.Content))
 		if err == nil {
-			rgba := image.NewRGBA(img.Bounds())
-			draw.Draw(rgba, rgba.Bounds(), img, image.Point{}, draw.Src)
-			cm.canvases[boardID] = rgba
-			return rgba
+			data := cm.createCanvasData(boardID)
+			draw.Draw(data.Backend.Image, data.Backend.Image.Bounds(), img, image.Point{}, draw.Src)
+			cm.canvases[boardID] = data
+			return data
 		}
 	}
 
-	rgba := image.NewRGBA(image.Rect(0, 0, CanvasWidth, CanvasHeight))
-	draw.Draw(rgba, rgba.Bounds(), &image.Uniform{color.RGBA{255, 255, 255, 255}}, image.Point{}, draw.Src)
-	cm.canvases[boardID] = rgba
-	return rgba
+	data := cm.createCanvasData(boardID)
+	cm.canvases[boardID] = data
+	return data
 }
 
 func (cm *CanvasManager) ApplyDraw(boardID uint, x1, y1, x2, y2 float64, col string, size float64, tool string) {
 	cm.mutex.RLock()
-	canvas, exists := cm.canvases[boardID]
+	data, exists := cm.canvases[boardID]
 	cm.mutex.RUnlock()
 
 	if !exists {
-		canvas = cm.GetOrCreateCanvas(boardID)
+		data = cm.GetOrCreateCanvas(boardID)
 	}
 
-	var colVal color.Color
+	cv := data.Canvas
+
 	if tool == "eraser" {
-		colVal = color.RGBA{255, 255, 255, 255}
+		cv.SetStrokeStyle("#FFFFFF")
+		cv.SetLineWidth(size * 4)
 	} else {
-		colVal = parseColor(col)
+		cv.SetStrokeStyle(col)
+		cv.SetLineWidth(size)
 	}
-	drawLine(canvas, x1, y1, x2, y2, colVal, size)
+	cv.SetLineCap(canvas.Round)
+	cv.SetLineJoin(canvas.Round)
+
+	cv.BeginPath()
+	cv.MoveTo(x1, y1)
+	cv.LineTo(x2, y2)
+	cv.Stroke()
 }
 
 func (cm *CanvasManager) ApplyText(boardID uint, x, y float64, textStr, col string, size float64) {
 	cm.mutex.RLock()
-	canvas, exists := cm.canvases[boardID]
+	data, exists := cm.canvases[boardID]
 	cm.mutex.RUnlock()
 
 	if !exists {
-		canvas = cm.GetOrCreateCanvas(boardID)
+		data = cm.GetOrCreateCanvas(boardID)
 	}
 
-	drawText(canvas, x, y, textStr, parseColor(col), size*2)
+	cv := data.Canvas
+	fontSize := size * 2
+
+	if data.Font != nil {
+		cv.SetFont(data.Font, fontSize * 1.3)
+	} else {
+		return
+	}
+
+	cv.SetFillStyle(col)
+
+	lines := strings.Split(textStr, "\n")
+	lineHeight := fontSize * 1.2
+	for i, line := range lines {
+		cv.FillText(line, x, y+float64(i)*lineHeight)
+	}
 }
 
 func (cm *CanvasManager) ClearCanvas(boardID uint) {
 	cm.mutex.RLock()
-	canvas, exists := cm.canvases[boardID]
+	data, exists := cm.canvases[boardID]
 	cm.mutex.RUnlock()
 
 	if !exists {
 		return
 	}
 
-	draw.Draw(canvas, canvas.Bounds(), &image.Uniform{color.RGBA{255, 255, 255, 255}}, image.Point{}, draw.Src)
+	data.Canvas.SetFillStyle("#FFFFFF")
+	data.Canvas.FillRect(0, 0, float64(CanvasWidth), float64(CanvasHeight))
 }
 
 func (cm *CanvasManager) GetContent(boardID uint) []byte {
 	cm.mutex.RLock()
-	canvas, exists := cm.canvases[boardID]
+	data, exists := cm.canvases[boardID]
 	cm.mutex.RUnlock()
 
-	if !exists || canvas == nil {
+	if !exists || data == nil {
 		return nil
 	}
 
 	var buf bytes.Buffer
-	err := webp.Encode(&buf, canvas, &webp.Options{Quality: 80})
+	err := webp.Encode(&buf, data.Backend.Image, &webp.Options{Quality: 80})
 	if err != nil {
 		return nil
 	}
@@ -158,10 +218,9 @@ func (cm *CanvasManager) UnregisterClient(boardID uint) {
 	cm.clients[boardID]--
 	if cm.clients[boardID] <= 0 {
 		delete(cm.clients, boardID)
-		if canvas, exists := cm.canvases[boardID]; exists {
+		if data, exists := cm.canvases[boardID]; exists {
 			var buf bytes.Buffer
-			if err := webp.Encode(&buf, canvas, &webp.Options{Quality: 80}); err == nil {
-				// Save to DB
+			if err := webp.Encode(&buf, data.Backend.Image, &webp.Options{Quality: 80}); err == nil {
 				cm.datastore.GormDB.Model(&models.Board{}).Where("id = ?", boardID).Update("content", buf.Bytes())
 			}
 			delete(cm.canvases, boardID)
@@ -169,31 +228,24 @@ func (cm *CanvasManager) UnregisterClient(boardID uint) {
 	}
 }
 
-func (cm *CanvasManager) loadFromDB(boardID uint) *image.RGBA {
+func (cm *CanvasManager) loadFromDB(boardID uint) *canvasData {
 	board := models.Board{}
 	if err := cm.datastore.GormDB.First(&board, boardID).Error; err != nil {
-		return createBlankCanvas()
+		return cm.createCanvasData(boardID)
 	}
 
 	if len(board.Content) == 0 {
-		return createBlankCanvas()
+		return cm.createCanvasData(boardID)
 	}
 
 	img, err := webp.Decode(bytes.NewReader(board.Content))
 	if err != nil {
-		return createBlankCanvas()
+		return cm.createCanvasData(boardID)
 	}
 
-	rgba := image.NewRGBA(img.Bounds())
-	draw.Draw(rgba, rgba.Bounds(), img, image.Point{}, draw.Src)
-	return rgba
-}
-
-func createBlankCanvas() *image.RGBA {
-	rgba := image.NewRGBA(image.Rect(0, 0, CanvasWidth, CanvasHeight))
-	println("Make new blank canvas")
-	draw.Draw(rgba, rgba.Bounds(), &image.Uniform{color.RGBA{255, 255, 255, 255}}, image.Point{}, draw.Src)
-	return rgba
+	data := cm.createCanvasData(boardID)
+	draw.Draw(data.Backend.Image, data.Backend.Image.Bounds(), img, image.Point{}, draw.Src)
+	return data
 }
 
 func (cm *CanvasManager) periodicSave() {
@@ -210,91 +262,6 @@ func (cm *CanvasManager) periodicSave() {
 			cm.SaveToDB(boardID)
 		}
 	}
-}
-
-func parseColor(col string) color.Color {
-	col = strings.TrimPrefix(col, "#")
-	if len(col) == 6 {
-		var r, g, b uint8
-		_, err := fmt.Sscanf(col, "%02x%02x%02x", &r, &g, &b)
-		if err == nil {
-			return color.RGBA{r, g, b, 255}
-		}
-	}
-	return color.RGBA{0, 0, 0, 255}
-}
-
-func drawLine(img *image.RGBA, x1, y1, x2, y2 float64, col color.Color, size float64) {
-	// Simple line drawing using Bresenham's algorithm
-	dx := int(x2 - x1)
-	dy := int(y2 - y1)
-	steps := abs(dx)
-	if abs(dy) > steps {
-		steps = abs(dy)
-	}
-	if steps == 0 {
-		drawCircle(img, int(x1), int(y1), int(size/2), col)
-		return
-	}
-
-	xInc := float64(dx) / float64(steps)
-	yInc := float64(dy) / float64(steps)
-
-	x, y := x1, y1
-	for i := 0; i <= steps; i++ {
-		drawCircle(img, int(x), int(y), int(size/2), col)
-		x += xInc
-		y += yInc
-	}
-}
-
-func drawCircle(img *image.RGBA, cx, cy, radius int, col color.Color) {
-	for y := cy - radius; y <= cy+radius; y++ {
-		for x := cx - radius; x <= cx+radius; x++ {
-			if x >= 0 && x < CanvasWidth && y >= 0 && y < CanvasHeight {
-				dx := x - cx
-				dy := y - cy
-				if dx*dx+dy*dy <= radius*radius {
-					img.Set(x, y, col)
-				}
-			}
-		}
-	}
-}
-
-func drawText(img *image.RGBA, x, y float64, textStr string, col color.Color, fontSize float64) {
-	// Simple text rendering - draw character by character
-	// For a more complete solution, you'd want a proper font library
-	fontWidth := int(fontSize * 0.6)
-
-	for i, ch := range textStr {
-		drawChar(img, int(x)+i*fontWidth, int(y), ch, col, fontSize)
-	}
-}
-
-func drawChar(img *image.RGBA, x, y int, ch rune, col color.Color, size float64) {
-	// Very basic character drawing - draws a simple representation
-	// This is a placeholder - in production you'd use a proper font renderer
-	// For now, just draw small rectangles based on character code
-	seed := int(ch) % 10
-	for dy := 0; dy < int(size); dy++ {
-		for dx := 0; dx < int(size*0.6); dx++ {
-			if (seed+dx+dy)%3 == 0 {
-				px := x + dx
-				py := y + dy
-				if px >= 0 && px < CanvasWidth && py >= 0 && py < CanvasHeight {
-					img.Set(px, py, col)
-				}
-			}
-		}
-	}
-}
-
-func abs(n int) int {
-	if n < 0 {
-		return -n
-	}
-	return n
 }
 
 func NewBoardService(app App) (*BoardService, error) {

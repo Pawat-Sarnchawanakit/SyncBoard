@@ -801,6 +801,7 @@
 
       btn.addEventListener('click', () => {
         brushSize = sz;
+        textEditor.style.fontSize = `${Math.max(12, brushSize * 2)}pt`;
         
         document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
@@ -992,10 +993,12 @@
       const x = (eventOrTouch.clientX || 0) - rect.left;
       const y = (eventOrTouch.clientY || 0) - rect.top;
 
-      
+      const font_size = Math.max(12, brushSize * 2);
       textEditor.style.display = 'block';
       textEditor.style.left = x + 'px';
-      textEditor.style.top = y + 'px';
+      textEditor.style.top = y - Math.floor(font_size * 1.333) + 'px';
+      textEditor.style.fontFamily = "sans-serif";
+      textEditor.style.fontSize = `${font_size}pt`;
       textEditor.value = '';
       textEditor.focus();
     }
@@ -1006,7 +1009,9 @@
         e.preventDefault();
         const text = textEditor.value;
         const x = parseInt(textEditor.style.left, 10) || 0;
-        const y = parseInt(textEditor.style.top, 10) || 0;
+        let y = parseInt(textEditor.style.top, 10) || 0;
+        const font_size = Math.max(12, brushSize * 2);
+        y += Math.floor(font_size * 1.333);
         finalizeText(text, x, y);
         sendText(x, y, text);
         textEditor.style.display = 'none';
@@ -1020,7 +1025,7 @@
       const fontSize = Math.max(12, (remoteSize || brushSize) * 2);
       ctx.save();
       ctx.fillStyle = remoteColor || currentColor;
-      ctx.font = fontSize + 'px sans-serif';
+      ctx.font = fontSize + 'pt sans-serif';
       const lines = text.split('\n');
       const lineHeight = fontSize * 1.2;
       for (let i = 0; i < lines.length; i++) {
