@@ -914,11 +914,9 @@
       if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({
           type: 'cursor',
-          payload: {
-            x: x,
-            y: y,
-            color: currentColor
-          },
+          x: x,
+          y: y,
+          color: currentColor
         }));
       }
     }
@@ -1083,6 +1081,9 @@
 
     function handleMessage(msg) {
       switch (msg.type) {
+        case 'history':
+          loadCanvasFromHistory(msg.content);
+          break;
         case 'draw':
           handleDraw(msg);
           break;
@@ -1096,6 +1097,20 @@
           clearCanvas();
           break;
       }
+    }
+
+    function loadCanvasFromHistory(base64Data) {
+      if (!base64Data) return;
+      
+      const img = new Image();
+      img.onload = function() {
+        ctx.drawImage(img, 0, 0);
+      };
+      const bytes = Uint8Array.fromBase64(base64Data);
+      const blob = new Blob([bytes], { type: 'image/webp' });
+      const url = URL.createObjectURL(blob);
+      console.log(url);
+      img.src = url;
     }
 
     function handleDraw(msg) {

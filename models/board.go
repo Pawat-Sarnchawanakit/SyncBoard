@@ -8,6 +8,7 @@ type Board struct {
 	Description string `gorm:"size:500"`
 	Tags        string `gorm:"size:500"`
 	OwnerID     uint   `gorm:"not null"`
+	Content     []byte `gorm:"type:blob"`
 }
 
 const (

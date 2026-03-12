@@ -376,6 +376,17 @@ func wsHandler(app WSApp, c *gin.Context) {
 	hub := app.GetServices().BoardService.GetHub()
 	hub.Register(client)
 
+	app.GetServices().BoardService.GetCanvasManager().RegisterClient(board.ID)
+
+	content := app.GetServices().BoardService.GetCanvasManager().GetContent(board.ID)
+	if content != nil {
+		historyMsg, _ := json.Marshal(map[string]interface{}{
+			"type":    "history",
+			"content": content,
+		})
+		client.Send <- historyMsg
+	}
+
 	go writePump(client)
 	go readPump(app, hub, client)
 }
@@ -383,6 +394,7 @@ func wsHandler(app WSApp, c *gin.Context) {
 func readPump(app WSApp, hub *boardsvc.Hub, c *boardsvc.Client) {
 	defer func() {
 		hub.Unregister(c)
+		app.GetServices().BoardService.GetCanvasManager().UnregisterClient(c.BoardID)
 		c.Conn.Close()
 	}()
 
@@ -400,15 +412,23 @@ func readPump(app WSApp, hub *boardsvc.Hub, c *boardsvc.Client) {
 		switch msg.Type {
 		case "draw":
 			if c.Permission == "owner" || c.Permission == "editor" {
+				var payload DrawPayload
+				if err := json.Unmarshal(message, &payload); err == nil {
+					app.GetServices().BoardService.GetCanvasManager().ApplyDraw(c.BoardID, payload.X1, payload.Y1, payload.X2, payload.Y2, payload.Color, payload.Size, payload.Tool)
+				}
 				hub.Broadcast(c.BoardID, message, c.Conn)
 			}
 		case "text":
 			if c.Permission == "owner" || c.Permission == "editor" {
+				var payload TextPayload
+				if err := json.Unmarshal(message, &payload); err == nil {
+					app.GetServices().BoardService.GetCanvasManager().ApplyText(c.BoardID, payload.X, payload.Y, payload.Text, payload.Color, payload.Size)
+				}
 				hub.Broadcast(c.BoardID, message, c.Conn)
 			}
 		case "cursor":
 			var payload CursorPayload
-			if err := json.Unmarshal(msg.Payload, &payload); err != nil {
+			if err := json.Unmarshal(message, &payload); err != nil {
 				log.Println(err)
 			}
 			payloadWithUsername, _ := json.Marshal(map[string]interface{}{
@@ -421,6 +441,7 @@ func readPump(app WSApp, hub *boardsvc.Hub, c *boardsvc.Client) {
 			hub.Broadcast(c.BoardID, payloadWithUsername, c.Conn)
 		case "clear":
 			if c.Permission == "owner" || c.Permission == "editor" {
+				app.GetServices().BoardService.GetCanvasManager().ClearCanvas(c.BoardID)
 				hub.Broadcast(c.BoardID, message, c.Conn)
 			}
 		}
