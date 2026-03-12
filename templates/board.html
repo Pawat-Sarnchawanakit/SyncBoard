@@ -263,16 +263,16 @@
     }
 
     .user-suggestions {
-      position: absolute;
+      position: fixed;
       background: white;
       border: 1px solid #ddd;
       border-radius: 4px;
       max-height: 150px;
       overflow-y: auto;
-      width: calc(100% - 100px);
-      margin-left: 45px;
+      width: 250px;
       display: none;
       z-index: 400;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     }
 
     .user-suggestions.show {
@@ -529,11 +529,11 @@
           <option value="editor">Editor</option>
         </select>
         <button class="add-member-btn" id="addMemberBtn" onclick="addMember()">Add</button>
-        <div class="user-suggestions" id="userSuggestions"></div>
       </div>
     </div>
   </div>
-  {{end}}
+  <div class="user-suggestions" id="userSuggestions"></div>
+{{end}}
 
   <script>
     let ws;
@@ -609,10 +609,15 @@
         if (response.ok) {
           const data = await response.json();
           const suggestions = document.getElementById('userSuggestions');
+          const input = document.getElementById('addMemberInput');
           if (data.users.length > 0) {
             suggestions.innerHTML = data.users.map(u => 
               '<div class="user-suggestion" onclick="selectUser(' + u.id + ', \'' + escapeHtml(u.username) + '\')">' + escapeHtml(u.username) + '</div>'
             ).join('');
+            
+            const rect = input.getBoundingClientRect();
+            suggestions.style.left = rect.left + 'px';
+            suggestions.style.top = (rect.bottom + 2) + 'px';
             suggestions.classList.add('show');
           } else {
             suggestions.classList.remove('show');

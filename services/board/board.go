@@ -203,12 +203,12 @@ type memberResponse struct {
 	Role     string
 }
 
-func (s *BoardService) AddMember(boardID uint, ownerID uint, targetUserID uint, role string) error {
+func (s *BoardService) UserRequestAddMember(boardID uint, requestUserID uint, targetUserID uint, role string) error {
 	board, err := s.GetBoard(boardID)
 	if err != nil {
 		return errors.New("board not found")
 	}
-	if board.OwnerID != ownerID {
+	if board.OwnerID != requestUserID {
 		return errors.New("only owner can add members")
 	}
 	if targetUserID == board.OwnerID {
@@ -234,12 +234,12 @@ func (s *BoardService) AddMember(boardID uint, ownerID uint, targetUserID uint, 
 	return datastore.GormDB.Create(&member).Error
 }
 
-func (s *BoardService) RemoveMember(boardID uint, ownerID uint, targetUserID uint) error {
+func (s *BoardService) UserRequestRemoveMember(boardID uint, requestUserID uint, targetUserID uint) error {
 	board, err := s.GetBoard(boardID)
 	if err != nil {
 		return errors.New("board not found")
 	}
-	if board.OwnerID != ownerID {
+	if board.OwnerID != requestUserID {
 		return errors.New("only owner can remove members")
 	}
 	if targetUserID == board.OwnerID {
@@ -257,12 +257,12 @@ func (s *BoardService) RemoveMember(boardID uint, ownerID uint, targetUserID uin
 	return nil
 }
 
-func (s *BoardService) UpdateMemberRole(boardID uint, ownerID uint, targetUserID uint, newRole string) error {
+func (s *BoardService) UserRequestUpdateMemberRole(boardID uint, requestUserID uint, targetUserID uint, newRole string) error {
 	board, err := s.GetBoard(boardID)
 	if err != nil {
 		return errors.New("board not found")
 	}
-	if board.OwnerID != ownerID {
+	if board.OwnerID != requestUserID {
 		return errors.New("only owner can update members")
 	}
 	if targetUserID == board.OwnerID {

@@ -529,12 +529,6 @@ func addBoardMemberHandler(app App, c *gin.Context) {
 		return
 	}
 
-	permission, err := app.GetServices().BoardService.GetUserPermission(uint(boardID), userID)
-	if err != nil || permission != "owner" {
-		c.JSON(http.StatusForbidden, gin.H{"error": "only owner can add members"})
-		return
-	}
-
 	var req AddMemberRequest
 	if err := c.BindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -567,7 +561,7 @@ func addBoardMemberHandler(app App, c *gin.Context) {
 		role = "viewer"
 	}
 
-	err = app.GetServices().BoardService.AddMember(uint(boardID), userID, targetUserID, role)
+	err = app.GetServices().BoardService.UserRequestAddMember(uint(boardID), userID, targetUserID, role)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -589,19 +583,13 @@ func removeBoardMemberHandler(app App, c *gin.Context) {
 		return
 	}
 
-	permission, err := app.GetServices().BoardService.GetUserPermission(uint(boardID), userID)
-	if err != nil || permission != "owner" {
-		c.JSON(http.StatusForbidden, gin.H{"error": "only owner can remove members"})
-		return
-	}
-
 	targetUserID, err := strconv.ParseUint(c.Param("userId"), 10, 32)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user id"})
 		return
 	}
 
-	err = app.GetServices().BoardService.RemoveMember(uint(boardID), userID, uint(targetUserID))
+	err = app.GetServices().BoardService.UserRequestRemoveMember(uint(boardID), userID, uint(targetUserID))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -623,12 +611,6 @@ func updateBoardMemberHandler(app App, c *gin.Context) {
 		return
 	}
 
-	permission, err := app.GetServices().BoardService.GetUserPermission(uint(boardID), userID)
-	if err != nil || permission != "owner" {
-		c.JSON(http.StatusForbidden, gin.H{"error": "only owner can update members"})
-		return
-	}
-
 	targetUserID, err := strconv.ParseUint(c.Param("userId"), 10, 32)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user id"})
@@ -641,7 +623,7 @@ func updateBoardMemberHandler(app App, c *gin.Context) {
 		return
 	}
 
-	err = app.GetServices().BoardService.UpdateMemberRole(uint(boardID), userID, uint(targetUserID), req.Role)
+	err = app.GetServices().BoardService.UserRequestUpdateMemberRole(uint(boardID), userID, uint(targetUserID), req.Role)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
