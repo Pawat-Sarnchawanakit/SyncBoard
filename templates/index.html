@@ -1,270 +1,275 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>SyncBoard - Realtime Whiteboard</title>
-<style>
-    /* Reset and base styles */
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
+    <style>
+      /* Reset and base styles */
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
 
-body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background-color: #f8f9fa;
-    color: #333;
-    line-height: 1.6;
-}
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background-color: #f8f9fa;
+        color: #333;
+        line-height: 1.6;
+      }
 
-/* Header styles */
-.header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1rem 2rem;
-    background-color: #ffffff;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    position: sticky;
-    top: 0;
-    z-index: 100;
-}
-
-.logo h1 {
-    color: #007bff;
-    font-size: 1.5rem;
-    font-weight: 700;
-}
-
-.nav ul {
-    display: flex;
-    list-style: none;
-    margin: 0;
-    padding: 0;
-}
-
-.nav ul li {
-    margin: 0 1rem;
-}
-
-.nav ul li a {
-    text-decoration: none;
-    color: #333;
-    font-weight: 500;
-    transition: color 0.3s ease;
-}
-
-.nav ul li a:hover {
-    color: #007bff;
-}
-
-.login-btn {
-    background-color: #007bff;
-    color: white;
-    border: none;
-    padding: 0.5rem 1rem;
-    border-radius: 4px;
-    cursor: pointer;
-    font-weight: 500;
-    transition: background-color 0.3s ease;
-}
-
-.login-btn:hover {
-    background-color: #0056b3;
-}
-
-/* Main content */
-.main-content {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 2rem;
-}
-
-/* Hero section */
-.hero {
-    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
-    border-radius: 8px;
-    padding: 3rem 2rem;
-    color: white;
-    text-align: center;
-    margin-bottom: 2rem;
-}
-
-.hero h2 {
-    font-size: 2.5rem;
-    margin-bottom: 1rem;
-}
-
-.hero p {
-    font-size: 1.2rem;
-    margin-bottom: 2rem;
-    opacity: 0.9;
-}
-
-.cta-button {
-    background-color: #ffffff;
-    color: #007bff;
-    border: none;
-    padding: 0.8rem 1.5rem;
-    border-radius: 4px;
-    font-weight: 600;
-    font-size: 1rem;
-    cursor: pointer;
-    transition: background-color 0.3s ease;
-}
-
-.cta-button:hover {
-    background-color: #e9ecef;
-}
-
-/* Features section */
-.features {
-    display: flex;
-    justify-content: space-around;
-    flex-wrap: wrap;
-    gap: 2rem;
-    margin-top: 2rem;
-}
-
-.feature {
-    text-align: center;
-    padding: 1rem;
-    flex: 1;
-    min-width: 200px;
-    max-width: 300px;
-    background: #ffffff;
-    border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    transition: transform 0.3s ease;
-}
-
-.feature:hover {
-    transform: translateY(-5px);
-}
-
-.feature h3 {
-    color: #007bff;
-    margin-bottom: 0.5rem;
-}
-
-.feature p {
-    color: #666;
-    font-size: 0.9rem;
-}
-
-/* Footer styles */
-.footer {
-    background-color: #ffffff;
-    padding: 1rem 2rem;
-    text-align: center;
-    border-top: 1px solid #e9ecef;
-    margin-top: 2rem;
-}
-
-/* Responsive design */
-@media (max-width: 768px) {
-    .header {
-        flex-direction: column;
-        padding: 1rem;
-    }
-
-    .nav ul {
-        margin-top: 1rem;
-        flex-wrap: wrap;
-        justify-content: center;
-    }
-
-    .nav ul li {
-        margin: 0.5rem;
-    }
-
-    .hero {
-        padding: 2rem 1rem;
-    }
-
-    .hero h2 {
-        font-size: 1.8rem;
-    }
-
-    .hero p {
-        font-size: 1rem;
-    }
-
-    .features {
-        flex-direction: column;
+      /* Header styles */
+      .header {
+        display: flex;
+        justify-content: space-between;
         align-items: center;
-    }
-}
-</style>
+        padding: 1rem 2rem;
+        background-color: #ffffff;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        position: sticky;
+        top: 0;
+        z-index: 100;
+      }
+
+      .logo h1 {
+        color: #007bff;
+        font-size: 1.5rem;
+        font-weight: 700;
+      }
+
+      .nav ul {
+        display: flex;
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+
+      .nav ul li {
+        margin: 0 1rem;
+      }
+
+      .nav ul li a {
+        text-decoration: none;
+        color: #333;
+        font-weight: 500;
+        transition: color 0.3s ease;
+        display: flex;
+        align-items: center;
+      }
+
+      .nav ul li a:hover {
+        color: #007bff;
+      }
+
+      .nav ul li a.selected {
+        color: #003bff;
+      }
+
+      .login-btn {
+        background-color: #007bff;
+        color: white;
+        border: none;
+        padding: 0.5rem 1rem;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: 500;
+        transition: background-color 0.3s ease;
+      }
+
+      .login-btn:hover {
+        background-color: #0056b3;
+      }
+
+      /* Main content */
+      .main-content {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 2rem;
+      }
+
+      /* Hero section */
+      .hero {
+        background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+        border-radius: 8px;
+        padding: 3rem 2rem;
+        color: white;
+        text-align: center;
+        margin-bottom: 2rem;
+      }
+
+      .hero h2 {
+        font-size: 2.5rem;
+        margin-bottom: 1rem;
+      }
+
+      .hero p {
+        font-size: 1.2rem;
+        margin-bottom: 2rem;
+        opacity: 0.9;
+      }
+
+      .cta-button {
+        background-color: #ffffff;
+        color: #007bff;
+        border: none;
+        padding: 0.8rem 1.5rem;
+        border-radius: 4px;
+        font-weight: 600;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+      }
+
+      .cta-button:hover {
+        background-color: #e9ecef;
+      }
+
+      /* Features section */
+      .features {
+        display: flex;
+        justify-content: space-around;
+        flex-wrap: wrap;
+        gap: 2rem;
+        margin-top: 2rem;
+      }
+
+      .feature {
+        text-align: center;
+        padding: 1rem;
+        flex: 1;
+        min-width: 200px;
+        max-width: 300px;
+        background: #ffffff;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        transition: transform 0.3s ease;
+      }
+
+      .feature:hover {
+        transform: translateY(-5px);
+      }
+
+      .feature h3 {
+        color: #007bff;
+        margin-bottom: 0.5rem;
+      }
+
+      .feature p {
+        color: #666;
+        font-size: 0.9rem;
+      }
+
+      /* Footer styles */
+      .footer {
+        background-color: #ffffff;
+        padding: 1rem 2rem;
+        text-align: center;
+        border-top: 1px solid #e9ecef;
+        margin-top: 2rem;
+      }
+
+      /* Responsive design */
+      @media (max-width: 768px) {
+        .header {
+          flex-direction: column;
+          padding: 1rem;
+        }
+
+        .nav ul {
+          margin-top: 1rem;
+          flex-wrap: wrap;
+          justify-content: center;
+        }
+
+        .nav ul li {
+          margin: 0.5rem;
+        }
+
+        .hero {
+          padding: 2rem 1rem;
+        }
+
+        .hero h2 {
+          font-size: 1.8rem;
+        }
+
+        .hero p {
+          font-size: 1rem;
+        }
+
+        .features {
+          flex-direction: column;
+          align-items: center;
+        }
+      }
+    </style>
     <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
     <script src="https://unpkg.com/feather-icons"></script>
-</head>
-<body>
+  </head>
+  <body>
     <header class="header">
-        <div class="logo">
-            <h1>SyncBoard</h1>
-        </div>
-        <nav class="nav">
-            <ul>
-                {{if .Authenticated}}
-                <li><a href="/myboards">My Boards</a></li>
-                {{else}}
-                <li><a href="/login">My Boards</a></li>
-                {{end}}
-                <li><a href="#teams">Teams</a></li>
-                <li><a href="#settings">Settings</a></li>
-            </ul>
-        </nav>
-        <div class="auth-buttons">
-            {{if .Authenticated}}
-            <button onclick="logout()" class="login-btn">Logout</button>
-            <script>
-                function logout() {
-                    fetch("/api/logout", {
-                        method: "POST"
-                    }).then(x => location.reload());
-                }
-            </script>
-            {{else}}
-            <a href="/login"><button class="login-btn">Login</button></a>
-            {{end}}
-        </div>
+      <div class="logo">
+        <h1>SyncBoard</h1>
+      </div>
+      <nav class="nav">
+        <ul>
+        <li><a class="selected"><i data-feather="home" style="width:16px;height:16px;vertical-align:middle;margin-right:4px;"></i>Home</a></li>
+          <li><a href="/{{if .Authenticated}}myboards{{else}}login{{end}}"><i data-feather="grid" style="width:16px;height:16px;vertical-align:middle;margin-right:4px;"></i>My Boards</a></li>
+          <li><a href="#teams"><i data-feather="users" style="width:16px;height:16px;vertical-align:middle;margin-right:4px;"></i>Teams</a></li>
+          <li><a href="#settings"><i data-feather="settings" style="width:16px;height:16px;vertical-align:middle;margin-right:4px;"></i>Settings</a></li>
+        </ul>
+      </nav>
+      <div class="auth-buttons">
+        {{if .Authenticated}}
+        <button onclick="logout()" class="login-btn"><i data-feather="log-out" style="width:16px;height:16px;vertical-align:middle;margin-right:4px;"></i>Logout</button>
+        {{else}}
+        <a href="/login"><button class="login-btn"><i data-feather="log-in" style="width:16px;height:16px;vertical-align:middle;margin-right:4px;"></i>Login</button></a>
+        {{end}}
+      </div>
     </header>
 
     <main class="main-content">
-        <section class="hero">
-            <div class="hero-content">
-                <h2>Realtime Collaboration Made Simple</h2>
-                <p>Draw, sketch, and collaborate in real-time with your team</p>
-                {{if .Authenticated}}
-                <a href="/myboards"><button class="cta-button">Go to My Boards</button></a>
-                {{else}}
-                <a href="/login"><button class="cta-button">Start Drawing</button></a>
-                {{end}}
-            </div>
-        </section>
+      <section class="hero">
+        <div class="hero-content">
+          <h2>Realtime Collaboration Made Simple</h2>
+          <p>Draw, sketch, and collaborate in real-time with your team</p>
+          {{if .Authenticated}}
+          <a href="/myboards"
+            ><button class="cta-button">Go to My Boards</button></a
+          >
+          {{else}}
+          <a href="/login"><button class="cta-button">Start Drawing</button></a>
+          {{end}}
+        </div>
+      </section>
 
-        <section class="features">
-            <div class="feature">
-                <i data-feather="edit-2"></i>
-                <h3>Realtime Drawing</h3>
-                <p>Draw together in real-time with your team members</p>
-            </div>
-            <div class="feature">
-                <i data-feather="users"></i>
-                <h3>Team Collaboration</h3>
-                <p>Invite your team and collaborate seamlessly</p>
-            </div>
-            <div class="feature">
-                <i data-feather="share-2"></i>
-                <h3>Easy Sharing</h3>
-                <p>Share boards with anyone instantly</p>
-            </div>
-        </section>
+      <section class="features">
+        <div class="feature">
+          <i data-feather="edit-2"></i>
+          <h3>Realtime Drawing</h3>
+          <p>Draw together in real-time with your team members</p>
+        </div>
+        <div class="feature">
+          <i data-feather="users"></i>
+          <h3>Team Collaboration</h3>
+          <p>Invite your team and collaborate seamlessly</p>
+        </div>
+        <div class="feature">
+          <i data-feather="share-2"></i>
+          <h3>Easy Sharing</h3>
+          <p>Share boards with anyone instantly</p>
+        </div>
+      </section>
     </main>
 
-    <script>feather.replace();</script>
-</body>
+    <script>
+      function logout() {
+        fetch("/api/logout", {
+          method: "POST",
+        }).then((x) => location.reload());
+      }
+      feather.replace();
+    </script>
+  </body>
 </html>

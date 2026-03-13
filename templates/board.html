@@ -4,9 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>White board</title>
+  <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
   <style>
     :root {
-      --toolbar-h: 110px;
       --topbar-h: 50px;
     }
     * { box-sizing: border-box; }
@@ -203,6 +203,7 @@
     .member-action-btn {
       padding: 4px 8px;
       font-size: 12px;
+      height: 32px;
       border: 1px solid #ddd;
       background: white;
       border-radius: 4px;
@@ -216,6 +217,11 @@
     .member-action-btn.remove {
       color: #dc3545;
       border-color: #dc3545;
+      width: 32px;
+      padding: 0;
+      align-items: center;
+      justify-content: center;
+      display: flex;
     }
 
     .member-action-btn.remove:hover {
@@ -316,7 +322,6 @@
     .toolbar {
       position: fixed;
       left: 0; right: 0; bottom: 0;
-      height: var(--toolbar-h);
       background: rgba(255, 255, 255, 0.98);
       border-top: 1px solid #eee;
       display: flex;
@@ -477,14 +482,14 @@
   <h3>{{.Permission}}</h3>
   <div class="board-container">
     <div class="topbar" id="topbar">
-      <button class="topbar-btn" onclick="window.location.href='/myboards'">← Back</button>
+      <button class="topbar-btn" onclick="window.location.href='/myboards'"><i data-feather="arrow-left" style="width:16px;height:16px;"></i> Back</button>
       <span class="topbar-title">{{.BoardTitle}}</span>
       <div class="topbar-right">
         <div style="display: flex;flex-direction: column;justify-content: center;">
           <span class="permission-badge" id="permissionBadge"></span>
         </div>
-        <button class="topbar-btn" id="shareBtn" onclick="copyShareLink()">Share</button>
-        <button class="topbar-btn" id="membersBtn" onclick="showMembersModal()" style="display:none;">Members</button>
+        <button class="topbar-btn" id="shareBtn" onclick="copyShareLink()"><i data-feather="share-2" style="width:16px;height:16px;"></i> Share</button>
+        <button class="topbar-btn" id="membersBtn" onclick="showMembersModal()" style="display:none;"><i data-feather="user-plus" style="width:16px;height:16px;"></i> Members</button>
       </div>
     </div>
 
@@ -499,9 +504,9 @@
 
     
     <div class="toolbar" aria-label="Drawing tools" id="toolbar">
-      <button class="tool-btn" id="penBtn" title="Pen (draw)">Pen</button>
-      <button class="tool-btn" id="eraserBtn" title="Eraser">Eraser</button>
-      <button class="tool-btn" id="textBtn" title="Text">Text</button>
+      <button class="tool-btn" id="penBtn" title="Pen (draw)"><i data-feather="edit-2" style="width:16px;height:16px;"></i> Pen</button>
+      <button class="tool-btn" id="eraserBtn" title="Eraser"><i data-feather="x-circle" style="width:16px;height:16px;"></i> Eraser</button>
+      <button class="tool-btn" id="textBtn" title="Text"><i data-feather="type" style="width:16px;height:16px;"></i> Text</button>
 
       <div class="spacer"></div>
 
@@ -512,7 +517,7 @@
       <div class="size-selector" id="sizeSelector" aria-label="Marker size"></div>
 
       
-      <button class="tool-btn" id="clearBtn" title="Clear canvas">Clear</button>
+      <button class="tool-btn" id="clearBtn" title="Clear canvas"><i data-feather="trash-2" style="width:16px;height:16px;"></i> Clear</button>
     </div>
   </div>
   <div class="members-modal" id="membersModal">
@@ -522,6 +527,18 @@
         <button class="close-modal" onclick="hideMembersModal()">&times;</button>
       </div>
       <div class="member-list" id="memberList"></div>
+      <template id="memberItemTemplate">
+        <div class="member-item">
+          <div class="member-info">
+            <span class="member-name"></span>
+            <span class="member-role"></span>
+          </div>
+          <div class="member-actions">
+            <button class="member-action-btn" onclick=""></button>
+            <button class="member-action-btn remove" onclick=""></button>
+          </div>
+        </div>
+      </template>
       <div class="add-member-form" style="position: relative;">
         <input type="text" class="add-member-input" id="addMemberInput" placeholder="Search username..." oninput="searchUsers(this.value)" autocomplete="off">
         <select class="add-member-select" id="addMemberRole">
@@ -533,8 +550,9 @@
     </div>
   </div>
   <div class="user-suggestions" id="userSuggestions"></div>
-{{end}}
-
+  <template id="userSuggestionTemplate">
+    <div class="user-suggestion"></div>
+  </template>
   <script>
     let ws;
     let userPermission = "{{.Permission}}";
@@ -580,22 +598,25 @@
 
     function renderMembers(members) {
       const list = document.getElementById('memberList');
-      list.innerHTML = members.map(m => `
-        <div class="member-item">
-          <div class="member-info">
-            <span class="member-name">${escapeHtml(m.username)}</span>
-            <span class="member-role">${m.role === 'owner' ? 'Owner' : m.role === 'editor' ? 'Editor' : 'Viewer'}</span>
-          </div>
-          ${m.role !== 'owner' ? `
-            <div class="member-actions">
-              <button class="member-action-btn" onclick="changeRole(${m.userId}, '${m.role === 'editor' ? 'viewer' : 'editor'}')">
-                ${m.role === 'editor' ? 'Make Viewer' : 'Make Editor'}
-              </button>
-              <button class="member-action-btn remove" onclick="removeMember(${m.userId})">Remove</button>
-            </div>
-          ` : ''}
-        </div>
-      `).join('');
+      const template = document.getElementById('memberItemTemplate');
+      list.innerHTML = '';
+      members.forEach(m => {
+        const clone = template.content.cloneNode(true);
+        clone.querySelector('.member-name').textContent = m.username;
+        clone.querySelector('.member-role').textContent = m.role === 'owner' ? 'Owner' : m.role === 'editor' ? 'Editor' : 'Viewer';
+        if (m.role !== 'owner') {
+          const actionsContainer = clone.querySelector('.member-actions');
+          const roleBtn = clone.querySelector('.member-action-btn:not(.remove)');
+          roleBtn.textContent = m.role === 'editor' ? 'Make Viewer' : 'Make Editor';
+          roleBtn.setAttribute('onclick', `changeRole(${m.userId}, '${m.role === 'editor' ? 'viewer' : 'editor'}')`);
+          const removeBtn = clone.querySelector('.member-action-btn.remove');
+          removeBtn.innerHTML = feather.icons["user-minus"].toSvg({ width: 16, height: 16 });
+          removeBtn.setAttribute('onclick', `removeMember(${m.userId})`);
+        } else {
+          clone.querySelector('.member-actions').remove();
+        }
+        list.appendChild(clone);
+      });
     }
 
     async function searchUsers(query) {
@@ -610,10 +631,15 @@
           const data = await response.json();
           const suggestions = document.getElementById('userSuggestions');
           const input = document.getElementById('addMemberInput');
+          const template = document.getElementById('userSuggestionTemplate');
           if (data.users.length > 0) {
-            suggestions.innerHTML = data.users.map(u => 
-              '<div class="user-suggestion" onclick="selectUser(' + u.id + ', \'' + escapeHtml(u.username) + '\')">' + escapeHtml(u.username) + '</div>'
-            ).join('');
+            suggestions.innerHTML = '';
+            data.users.forEach(u => {
+              const clone = template.content.cloneNode(true);
+              clone.querySelector('.user-suggestion').textContent = u.username;
+              clone.querySelector('.user-suggestion').setAttribute('onclick', `selectUser(${u.id}, '${escapeHtml(u.username)}')`);
+              suggestions.appendChild(clone);
+            });
             
             const rect = input.getBoundingClientRect();
             suggestions.style.left = rect.left + 'px';
@@ -1171,6 +1197,9 @@
         cursorEl.style.opacity = '0.5';
       }
     }, 3000);
+
+    feather.replace();
   </script>
+{{end}}
 </body>
 </html>
