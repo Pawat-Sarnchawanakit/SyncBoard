@@ -87,4 +87,52 @@ func RegisterHandlers(app App) {
 		}
 		c.HTML(http.StatusOK, "login.html", gin.H{})
 	})
+	router.GET("/teams", func(c *gin.Context) {
+		if !auth.IsAuthenticated(app, c) {
+			c.Redirect(http.StatusTemporaryRedirect, "/login")
+			return
+		}
+		c.HTML(http.StatusOK, "teams.html", gin.H{})
+	})
+	router.GET("/team/:id", func(c *gin.Context) {
+		if !auth.IsAuthenticated(app, c) {
+			c.Redirect(http.StatusTemporaryRedirect, "/login")
+			return
+		}
+
+		teamID, err := strconv.ParseUint(c.Param("id"), 10, 32)
+		if err != nil {
+			c.Redirect(http.StatusTemporaryRedirect, "/teams")
+			return
+		}
+
+		token, _ := c.Cookie("tk")
+		userID, err := app.GetServices().AuthenticationService.VerifyToken(token)
+		if err != nil {
+			c.Redirect(http.StatusTemporaryRedirect, "/login")
+			return
+		}
+
+		if !app.GetServices().TeamService.IsTeamMember(uint(teamID), userID) {
+			c.Redirect(http.StatusTemporaryRedirect, "/teams")
+			return
+		}
+
+		team, err := app.GetServices().TeamService.GetTeam(uint(teamID))
+		if err != nil {
+			c.Redirect(http.StatusTemporaryRedirect, "/teams")
+			return
+		}
+
+		role := "member"
+		if team.OwnerID == userID {
+			role = "owner"
+		}
+
+		c.HTML(http.StatusOK, "team.html", gin.H{
+			"TeamId":    c.Param("id"),
+			"TeamTitle": team.Title,
+			"Role":      role,
+		})
+	})
 }

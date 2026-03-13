@@ -8,6 +8,7 @@ type Board struct {
 	Description string `gorm:"size:500"`
 	Tags        string `gorm:"size:500"`
 	OwnerID     uint   `gorm:"not null"`
+	TeamID      uint   `gorm:"index"`
 	Content     []byte `gorm:"type:blob"`
 }
 
@@ -19,7 +20,10 @@ const (
 
 type BoardMember struct {
 	gorm.Model
-	BoardID uint   `gorm:"not null;index"`
-	UserID  uint   `gorm:"not null;index"`
-	Role    string `gorm:"size:20;not null;default:'viewer'"`
+	BoardID            uint   `gorm:"not null;index"`
+	UserID             uint   `gorm:"not null;index"`
+	Role               string `gorm:"size:20;not null;default:'viewer'"`
+	CanGrantPermission bool   `gorm:"not null;default:true"`
+	CanDelete          bool   `gorm:"not null;default:false"`
+	CanEditMetadata    bool   `gorm:"not null;default:false"`
 }

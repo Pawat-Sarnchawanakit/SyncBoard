@@ -4,6 +4,7 @@ import (
 	"sync-board/models"
 	"sync-board/services/auth"
 	"sync-board/services/board"
+	"sync-board/services/team"
 
 	"github.com/gin-gonic/gin"
 )
@@ -11,6 +12,7 @@ import (
 type Services struct {
 	AuthenticationService *auth.AuthenticationService
 	BoardService          *board.BoardService
+	TeamService           *team.TeamService
 }
 
 type App interface {
@@ -26,6 +28,10 @@ func NewServices(app App) (*Services, error) {
 		return nil, err
 	}
 	services.BoardService, err = board.NewBoardService(app)
+	if err != nil {
+		return nil, err
+	}
+	services.TeamService, err = team.NewTeamService(app)
 	if err != nil {
 		return nil, err
 	}
