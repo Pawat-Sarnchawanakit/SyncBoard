@@ -812,7 +812,7 @@ func (s *BoardService) GetBoardMembers(boardID uint) ([]memberResponse, error) {
 
 	var ownerUser ownerWithUser
 	if err := datastore.GormDB.
-		Table("users").
+		Model(&models.User{}).
 		Select("id as owner_id, username").
 		Where("id = (SELECT owner_id FROM boards WHERE id = ?)", boardID).
 		Scan(&ownerUser).Error; err != nil {
@@ -857,7 +857,7 @@ func (s *BoardService) GetBoardMembersPaginated(boardID uint, offset, limit int)
 
 	var ownerUser ownerWithUser
 	if err := datastore.GormDB.
-		Table("users").
+		Model(&models.User{}).
 		Select("id as owner_id, username").
 		Where("id = (SELECT owner_id FROM boards WHERE id = ?)", boardID).
 		Scan(&ownerUser).Error; err != nil {
@@ -878,6 +878,8 @@ func (s *BoardService) GetBoardMembersPaginated(boardID uint, offset, limit int)
 
 	var boardMembersWithUsers []memberWithUser
 	if err := datastore.GormDB.
+		Model(&models.BoardMember{}).
+		Select("users.username as username, *").
 		Joins("JOIN users ON users.id = board_members.user_id").
 		Where("board_members.board_id = ?", boardID).
 		Order("board_members.created_at asc").
@@ -956,7 +958,7 @@ func (s *BoardService) GetBoardTitleAndPermission(boardID uint, userID uint) (st
 
 	var results []result
 	err := datastore.GormDB.
-		Table("boards").
+		Model(&models.Board{}).
 		Select("boards.id as board_id, boards.title, boards.description, boards.owner_id, boards.team_id, board_members.role as member_role, team_boards.board_owner_id").
 		Joins("LEFT JOIN board_members ON boards.id = board_members.board_id AND board_members.user_id = ?", userID).
 		Joins("LEFT JOIN team_boards ON boards.id = team_boards.board_id").

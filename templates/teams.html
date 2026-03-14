@@ -476,6 +476,9 @@
           teamsTotal = data.total || 0;
           const newTeams = data.teams || [];
 
+          if(newTeams.length < teamsLimit)
+            document.removeEventListener("scroll", handleScroll);
+
           if (!append) {
             teamsData = newTeams;
             teamsOffset = newTeams.length;

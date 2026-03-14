@@ -108,6 +108,12 @@
         .team-header-header { flex-direction: column; gap: 0.5rem; }
         .boards-list { grid-template-columns: 1fr; }
       }
+      .user-suggestions { position: absolute; background: white; border: 1px solid #ddd; border-radius: 4px; max-height: 200px; overflow-y: auto; z-index: 1000; width: calc(100% - 4rem); margin-top: 4px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: none; }
+      .user-suggestions.show { display: block; }
+      .user-suggestion { padding: 0.75rem 1rem; cursor: pointer; border-bottom: 1px solid #eee; }
+      .user-suggestion:last-child { border-bottom: none; }
+      .user-suggestion:hover { background: #f8f9fa; }
+      .form-group-with-suggestions { position: relative; }
     </style>
   </head>
   <body>
@@ -217,10 +223,18 @@
       <div class="modal-content">
         <h3>Add Team Member</h3>
         <form id="addMemberForm">
-          <div class="form-group">
+          <div class="form-group form-group-with-suggestions">
             <label for="memberUsername">Username *</label>
-            <input type="text" id="memberUsername" name="username" required placeholder="Enter username" />
+            <input type="text" id="memberUsername" name="username" required placeholder="Search username..." autocomplete="off" oninput="searchTeamMembers(this.value)" />
+            <div id="memberUserSuggestions" class="user-suggestions"></div>
             <p id="memberError" class="error-msg" style="display: none"></p>
+          </div>
+          <div class="form-group">
+            <label for="addMemberRole">Role</label>
+            <select id="addMemberRole">
+              <option value="member">Member</option>
+              <option value="admin">Admin</option>
+            </select>
           </div>
           <div class="modal-actions">
             <button type="button" onclick="hideAddMemberModal()" class="btn-cancel">Cancel</button>
@@ -230,16 +244,19 @@
       </div>
     </div>
 
+    <div id="memberUserSuggestionsTemplate" style="display: none;">
+      <div class="user-suggestion" onclick="selectTeamMember(this.dataset.userId, this.dataset.username)"></div>
+    </div>
+
     <!-- Create Team Board Modal -->
     <div id="createTeamBoardModal" class="modal">
       <div class="modal-content">
         <h3>Create Team Board</h3>
         <form id="createTeamBoardForm">
-          <div class="form-group">
+          <div class="form-group form-group-with-suggestions">
             <label for="boardMemberUsername">Grant to Member *</label>
-            <select id="boardMemberUsername" required>
-              <option value="">Select a team member</option>
-            </select>
+            <input type="text" id="boardMemberUsername" name="username" required placeholder="Search username..." autocomplete="off" oninput="searchBoardMembers(this.value)" />
+            <div id="boardMemberSuggestions" class="user-suggestions"></div>
             <p id="boardMemberError" class="error-msg" style="display: none"></p>
           </div>
           <div class="form-group">
@@ -261,6 +278,10 @@
           </div>
         </form>
       </div>
+    </div>
+
+    <div id="boardMemberSuggestionsTemplate" style="display: none;">
+      <div class="user-suggestion" onclick="selectBoardMember(this.dataset.userId, this.dataset.username)"></div>
     </div>
 
     <!-- Edit Board Modal -->
@@ -382,6 +403,8 @@
       let isLoadingBoards = false;
       let hasMoreBoards = true;
       let activeTab = 'boards';
+      let selectedMemberUserId = null;
+      let selectedBoardMemberUserId = null;
 
       function logout() {
         fetch("/api/logout", { method: "POST" }).then((x) => (window.location.href = "/"));
@@ -469,39 +492,75 @@
 
       function hideAddMemberModal() {
         document.getElementById("addMemberModal").classList.remove("show");
+        document.getElementById("memberUsername").value = "";
+        document.getElementById("memberError").style.display = "none";
+        document.getElementById("memberUserSuggestions").classList.remove("show");
+        selectedMemberUserId = null;
       }
 
       // Board Modals
       function showCreateTeamBoardModal() {
-        const select = document.getElementById("boardMemberUsername");
-        select.innerHTML = '<option value="">Select a team member</option>';
-        
-        // Add team owner option first
-        const teamOwner = teamMembers.find(m => m.role === "owner");
-        if (teamOwner && currentRole === "owner") {
-          const ownerOption = document.createElement("option");
-          ownerOption.value = teamOwner.username;
-          ownerOption.textContent = teamOwner.username + " (Team Owner)";
-          select.appendChild(ownerOption);
-        }
-        
-        // Add other members
-        teamMembers.forEach(member => {
-          if (member.role !== "owner") {
-            const option = document.createElement("option");
-            option.value = member.username;
-            option.textContent = member.username + " (" + member.role + ")";
-            select.appendChild(option);
-          }
-        });
-
-        document.getElementById("createTeamBoardModal").classList.add("show");
+        selectedBoardMemberUserId = null;
+        document.getElementById("boardMemberUsername").value = "";
         document.getElementById("boardTitle").value = "";
         document.getElementById("boardDescription").value = "";
         document.getElementById("boardTags").value = "";
         document.getElementById("boardTitleError").style.display = "none";
+        document.getElementById("boardMemberError").style.display = "none";
+        document.getElementById("boardMemberSuggestions").classList.remove("show");
+        document.getElementById("createTeamBoardModal").classList.add("show");
         document.getElementById("createBoardSubmitBtn").disabled = false;
         document.getElementById("createBoardSubmitBtn").textContent = "Create";
+      }
+
+      function hideCreateTeamBoardModal() {
+        document.getElementById("createTeamBoardModal").classList.remove("show");
+        document.getElementById("boardMemberSuggestions").classList.remove("show");
+        selectedBoardMemberUserId = null;
+      }
+
+      async function searchBoardMembers(query) {
+        if (query.length < 1) {
+          document.getElementById('boardMemberSuggestions').classList.remove('show');
+          return;
+        }
+
+        try {
+          const response = await fetch('/api/teams/' + teamId + '/members/search?q=' + encodeURIComponent(query));
+          if (response.ok) {
+            const data = await response.json();
+            const suggestions = document.getElementById('boardMemberSuggestions');
+            const input = document.getElementById('boardMemberUsername');
+            if (data.users.length > 0) {
+              suggestions.innerHTML = '';
+              data.users.forEach(u => {
+                const el = document.createElement('div');
+                el.className = 'user-suggestion';
+                el.textContent = u.username;
+                el.dataset.userId = u.id;
+                el.dataset.username = u.username;
+                el.onclick = function() { selectBoardMember(u.id, u.username); };
+                suggestions.appendChild(el);
+              });
+              
+              const rect = input.getBoundingClientRect();
+              suggestions.style.left = '1rem';
+              suggestions.style.right = '1rem';
+              suggestions.style.top = (input.offsetTop + input.offsetHeight) + 'px';
+              suggestions.classList.add('show');
+            } else {
+              suggestions.classList.remove('show');
+            }
+          }
+        } catch (err) {
+          console.error('Failed to search members:', err);
+        }
+      }
+
+      function selectBoardMember(userId, username) {
+        selectedBoardMemberUserId = parseInt(userId);
+        document.getElementById('boardMemberUsername').value = username;
+        document.getElementById('boardMemberSuggestions').classList.remove('show');
       }
 
       function hideCreateTeamBoardModal() {
@@ -666,6 +725,7 @@
       document.getElementById("addMemberForm").addEventListener("submit", async function (e) {
         e.preventDefault();
         const username = document.getElementById("memberUsername").value.trim();
+        const role = document.getElementById("addMemberRole").value;
         const errorEl = document.getElementById("memberError");
         const submitBtn = document.getElementById("addMemberSubmitBtn");
 
@@ -682,7 +742,7 @@
           const response = await fetch("/api/teams/" + teamId + "/members", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ username }),
+            body: JSON.stringify({ username, role }),
           });
           const data = await response.json();
           if (response.ok) {
@@ -701,6 +761,50 @@
           submitBtn.textContent = "Add";
         }
       });
+
+      async function searchTeamMembers(query) {
+        if (query.length < 1) {
+          document.getElementById('memberUserSuggestions').classList.remove('show');
+          return;
+        }
+
+        try {
+          const response = await fetch('/api/users/search?q=' + encodeURIComponent(query));
+          if (response.ok) {
+            const data = await response.json();
+            const suggestions = document.getElementById('memberUserSuggestions');
+            const input = document.getElementById('memberUsername');
+            if (data.users.length > 0) {
+              suggestions.innerHTML = '';
+              data.users.forEach(u => {
+                const el = document.createElement('div');
+                el.className = 'user-suggestion';
+                el.textContent = u.username;
+                el.dataset.userId = u.id;
+                el.dataset.username = u.username;
+                el.onclick = function() { selectTeamMember(u.id, u.username); };
+                suggestions.appendChild(el);
+              });
+              
+              const rect = input.getBoundingClientRect();
+              suggestions.style.left = '1rem';
+              suggestions.style.right = '1rem';
+              suggestions.style.top = (input.offsetTop + input.offsetHeight) + 'px';
+              suggestions.classList.add('show');
+            } else {
+              suggestions.classList.remove('show');
+            }
+          }
+        } catch (err) {
+          console.error('Failed to search members:', err);
+        }
+      }
+
+      function selectTeamMember(userId, username) {
+        selectedMemberUserId = parseInt(userId);
+        document.getElementById('memberUsername').value = username;
+        document.getElementById('memberUserSuggestions').classList.remove('show');
+      }
 
       document.getElementById("createTeamBoardForm").addEventListener("submit", async function (e) {
         e.preventDefault();

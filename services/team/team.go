@@ -358,7 +358,7 @@ func (s *TeamService) GetTeamMembers(teamID uint) ([]teamMemberResponse, error) 
 
 	var results []result
 	if err := datastore.GormDB.
-		Table("users").
+		Model(&models.User{}).
 		Select("COALESCE(team_members.user_id, teams.owner_id) as user_id, users.username, COALESCE(team_members.role, 'owner') as role").
 		Joins("LEFT JOIN team_members ON users.id = team_members.user_id AND team_members.team_id = ?", teamID).
 		Joins("JOIN teams ON teams.id = ?", teamID).
@@ -391,12 +391,12 @@ func (s *TeamService) GetTeamMembersPaginated(teamID uint, offset, limit int) ([
 
 	var results []result
 	if err := datastore.GormDB.
-		Model(&models.User{}).
+		Model(&models.TeamMember{}).
 		Select("COALESCE(team_members.user_id, teams.owner_id) as user_id, users.username, COALESCE(team_members.role, 'owner') as role").
-		Joins("LEFT JOIN team_members ON users.id = team_members.user_id AND team_members.team_id = ?", teamID).
+		Joins("JOIN users ON users.id = team_members.user_id AND team_members.team_id = ?", teamID).
 		Joins("JOIN teams ON teams.id = ?", teamID).
 		Where("users.id = teams.owner_id OR team_members.team_id = ?", teamID).
-		Scan(&results).Error; err != nil {
+		Find(&results).Error; err != nil {
 		return nil, 0, err
 	}
 
@@ -474,7 +474,7 @@ func (s *TeamService) RemoveTeamMember(teamID uint, requestUserID uint, targetUs
 	}
 
 	datastore := s.app.GetDatastore()
-	result := datastore.GormDB.Where("team_id = ? AND user_id = ?", teamID, targetUserID).Delete(&models.TeamMember{})
+	result := datastore.GormDB.Model(&models.TeamMember{}).Where("team_id = ? AND user_id = ?", teamID, targetUserID).Delete(&models.TeamMember{})
 	if result.Error != nil {
 		return result.Error
 	}
@@ -508,6 +508,23 @@ func (s *TeamService) UpdateTeamMemberRole(teamID uint, requestUserID uint, targ
 
 	member.Role = newRole
 	return datastore.GormDB.Save(&member).Error
+}
+
+func (s *TeamService) SearchTeamMembers(teamID uint, query string) ([]models.User, error) {
+	datastore := s.app.GetDatastore()
+
+	var users []models.User
+	if err := datastore.GormDB.
+		Model(&models.TeamMember{}).
+		Select("users.id, users.username").
+		Joins("JOIN users ON users.id = team_members.user_id AND team_members.team_id = ?", teamID).
+		Where("users.username LIKE ?", "%"+query+"%").
+		Limit(10).
+		Find(&users).Error; err != nil {
+		return nil, err
+	}
+
+	return users, nil
 }
 
 type BoardRestrictions struct {
@@ -613,7 +630,7 @@ func (s *TeamService) GetTeamBoards(teamID uint, offset, limit int) ([]TeamBoard
 
 	var boardResults []result
 	if err := datastore.GormDB.
-		Table("team_boards").
+		Model(&models.TeamBoard{}).
 		Select("team_boards.*, boards.id as board_id, boards.title, boards.description, boards.tags, boards.owner_id, users.username as owner_name, boards.created_at").
 		Joins("JOIN boards ON boards.id = team_boards.board_id").
 		Joins("JOIN users ON team_boards.board_owner_id = users.id").
@@ -670,6 +687,7 @@ func (s *TeamService) GetUserTeams(userID uint, offset, limit int) ([]TeamWithRo
 		Select("teams.*, team_members.role").
 		Joins("JOIN team_members ON teams.id = team_members.team_id").
 		Where("team_members.user_id = ?", userID).
+		Where("team_members.deleted_at IS NULL").
 		Order("teams.created_at desc").
 		Find(&teamsWithRole).Error; err != nil {
 		return nil, 0, err
@@ -732,7 +750,7 @@ func (s *TeamService) UserCanViewTeamBoardRestrictions(boardID uint, userID uint
 
 	var board boardWithTeam
 	if err := datastore.GormDB.
-		Table("boards").
+		Model(&models.Board{}).
 		Select("team_id, owner_id").
 		Where("id = ?", boardID).
 		Scan(&board).Error; err != nil {
@@ -765,7 +783,7 @@ func (s *TeamService) UserCanUpdateTeamBoardRestrictions(boardID uint, requestUs
 
 	var board boardWithTeam
 	if err := datastore.GormDB.
-		Table("boards").
+		Model(&models.Board{}).
 		Select("team_id, owner_id").
 		Where("id = ?", boardID).
 		Scan(&board).Error; err != nil {

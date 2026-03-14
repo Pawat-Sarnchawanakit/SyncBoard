@@ -623,6 +623,40 @@ func updateTeamBoardMemberRestrictionsHandler(app App, c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "restrictions updated"})
 }
 
+
+func searchTeamMembersHandler(app App, c *gin.Context) {
+	teamID, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid team id"})
+		return
+	}
+
+	query := c.Query("q")
+	if query == "" {
+		c.JSON(http.StatusOK, gin.H{"users": []interface{}{}})
+		return
+	}
+
+	users, err := app.GetServices().TeamService.SearchTeamMembers(uint(teamID), query)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	type userResult struct {
+		ID       uint   `json:"id"`
+		Username string `json:"username"`
+	}
+
+	var results []userResult
+	for _, u := range users {
+		results = append(results, userResult{ID: u.ID, Username: u.Username})
+	}
+
+	c.JSON(http.StatusOK, gin.H{"users": results})
+}
+
+
 func RegisterHandlers(app App) {
 	router := app.GetRouter()
 	router.POST("/api/teams", func(c *gin.Context) { createTeamHandler(app, c) })
@@ -634,6 +668,7 @@ func RegisterHandlers(app App) {
 	router.GET("/api/teams/:id/members", func(c *gin.Context) { getTeamMembersHandler(app, c) })
 	router.POST("/api/teams/:id/members", func(c *gin.Context) { addTeamMemberHandler(app, c) })
 	router.DELETE("/api/teams/:id/members/:userId", func(c *gin.Context) { removeTeamMemberHandler(app, c) })
+	router.GET("/api/teams/:id/members/search", func(c *gin.Context) { searchTeamMembersHandler(app, c) })
 	router.GET("/api/teams/:id/boards", func(c *gin.Context) { getTeamBoardsHandler(app, c) })
 	router.POST("/api/teams/:id/boards", func(c *gin.Context) { createTeamBoardHandler(app, c) })
 	router.GET("/api/teams/:id/boards/:boardId/members/:userId/restrictions", func(c *gin.Context) { getTeamBoardMemberRestrictionsHandler(app, c) })

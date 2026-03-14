@@ -147,6 +147,26 @@
         margin-bottom: 0.5rem;
       }
 
+      .board-card-badges {
+        display: flex;
+        gap: 0.25rem;
+        flex-wrap: wrap;
+        margin-bottom: 0.25rem;
+      }
+
+      .badge {
+        display: inline-block;
+        padding: 0.15rem 0.4rem;
+        border-radius: 4px;
+        font-size: 0.7rem;
+        font-weight: 500;
+      }
+
+      .badge-personal { background: #e9ecef; color: #495057; }
+      .badge-team { background: #cce5ff; color: #004085; }
+      .badge-shared { background: #fff3cd; color: #856404; }
+      .badge-owner { background: #d1e7dd; color: #0f5132; }
+
       .board-card h3 {
         font-size: 1.2rem;
         color: #333;
@@ -448,7 +468,7 @@
       <template id="boardCardTemplate">
         <div class="board-card">
           <div class="board-card-header">
-            <h3></h3>
+            <div class="board-card-badges"></div>
             <div class="card-actions">
               <button class="action-btn" title="Edit board">
                 <i data-feather="edit-3"></i>
@@ -458,6 +478,7 @@
               </button>
             </div>
           </div>
+          <h3></h3>
           <p class="board-description"></p>
           <p class="board-meta"></p>
           <div class="tags-container"></div>
@@ -630,6 +651,7 @@
 
     <script>
       feather.replace();
+      const currentUserId = {{.UserID}};
       let boardsData = [];
 
       function logout() {
@@ -950,14 +972,15 @@
 
           const newBoards = data.boards || [];
 
+          if(newBoards.length < boardsLimit)
+            document.removeEventListener("scroll", handleScroll);
+
           if (!append) {
             boardsData = newBoards;
             boardsOffset = newBoards.length;
           } else {
             boardsData = [...boardsData, ...newBoards];
             boardsOffset += newBoards.length;
-            if(newBoards.length < boardsLimit)
-              document.removeEventListener("scroll", handleScroll);
           }
 
           if (response.ok && boardsData.length > 0) {
@@ -968,8 +991,37 @@
             newBoards.forEach(board => {
               const tags = parseTags(board.tags);
               const clone = template.content.cloneNode(true);
-              clone.querySelector('.board-card-header h3').textContent = board.title;
-              clone.querySelector('.board-card-header h3').setAttribute('onclick', `openBoard(${board.id})`);
+              
+              // Render badges
+              const badges = [];
+              const isOwner = board.ownerId === currentUserId;
+              const isTeamBoardOwner = board.teamBoardOwnerId === currentUserId;
+              const isShared = board.ownerId !== currentUserId && board.teamBoardOwnerId !== currentUserId;
+              
+              if (board.teamId > 0) {
+                badges.push({ type: 'team', label: 'Team' });
+                if (isOwner || isTeamBoardOwner) {
+                  badges.push({ type: 'owner', label: 'Owner' });
+                }
+                if (isShared) {
+                  badges.push({ type: 'shared', label: 'Shared' });
+                }
+              } else if (isOwner) {
+                badges.push({ type: 'personal', label: 'Personal' });
+              } else if (isShared) {
+                badges.push({ type: 'shared', label: 'Shared' });
+              }
+              
+              const badgesContainer = clone.querySelector('.board-card-badges');
+              badges.forEach(badge => {
+                const badgeEl = document.createElement('span');
+                badgeEl.className = 'badge badge-' + badge.type;
+                badgeEl.textContent = badge.label;
+                badgesContainer.appendChild(badgeEl);
+              });
+              
+              clone.querySelector('h3').textContent = board.title;
+              clone.querySelector('h3').setAttribute('onclick', `openBoard(${board.id})`);
               clone.querySelector('.action-btn').setAttribute('onclick', `event.stopPropagation(); showEditModal(${board.id})`);
               clone.querySelector('.action-btn.delete').setAttribute('onclick', `event.stopPropagation(); showDeleteModal(${board.id})`);
               if (board.description) {

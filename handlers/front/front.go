@@ -27,7 +27,15 @@ func RegisterHandlers(app App) {
 			c.Redirect(http.StatusTemporaryRedirect, "/login")
 			return
 		}
-		c.HTML(http.StatusOK, "myboards.html", gin.H{})
+		token, _ := c.Cookie("tk")
+		userID, err := app.GetServices().AuthenticationService.VerifyToken(token)
+		if err != nil {
+			c.Redirect(http.StatusTemporaryRedirect, "/login")
+			return
+		}
+		c.HTML(http.StatusOK, "myboards.html", gin.H{
+			"UserID": userID,
+		})
 	})
 	router.GET("/board/:id", func(c *gin.Context) {
 		authenticated := auth.IsAuthenticated(app, c)
