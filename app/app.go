@@ -59,6 +59,6 @@ func (app *App) GetHost() string {
 	return app.host
 }
 
-func (app *App) Run() {
-	app.router.Run(app.host)
+func (app *App) Run() error {
+	return app.router.Run(app.host)
 }

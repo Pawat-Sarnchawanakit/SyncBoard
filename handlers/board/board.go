@@ -393,7 +393,7 @@ func readPump(app WSApp, hub *boardsvc.Hub, c *boardsvc.Client) {
 	defer func() {
 		hub.Unregister(c)
 		app.GetServices().BoardService.GetCanvasManager().UnregisterClient(c.BoardID)
-		c.Conn.Close()
+		_ = c.Conn.Close()
 	}()
 
 	for {
@@ -447,33 +447,19 @@ func readPump(app WSApp, hub *boardsvc.Hub, c *boardsvc.Client) {
 }
 
 func writePump(c *boardsvc.Client) {
-	defer c.Conn.Close()
+	defer (func() {
+		_ = c.Conn.Close()
+	})()
 	for {
 		message, ok := <-c.Send
 		if !ok {
-			c.Conn.WriteMessage(websocket.CloseMessage, []byte{})
+			_ = c.Conn.WriteMessage(websocket.CloseMessage, []byte{})
 			return
 		}
 		if err := c.Conn.WriteMessage(websocket.TextMessage, message); err != nil {
 			return
 		}
 	}
-}
-
-func getUserIDWithUsername(app App, c *gin.Context) (uint, string, bool) {
-	token, err := c.Cookie("tk")
-	if err != nil {
-		return 0, "", false
-	}
-	userID, err := app.GetServices().AuthenticationService.VerifyToken(token)
-	if err != nil {
-		return 0, "", false
-	}
-	user, err := app.GetServices().AuthenticationService.GetUserByID(userID)
-	if err != nil {
-		return 0, "", false
-	}
-	return userID, user.Username, true
 }
 
 func getBoardAccessHandler(app App, c *gin.Context) {

@@ -72,18 +72,18 @@ func (cur *AuthenticationService) Login(username string, password string) (strin
 	user := models.User{}
 	// Prevents user enumeration, use generic errors
 	if err := datastore.GormDB.First(&user, &models.User{Username: username}).Error; err != nil {
-		return "", errors.New("Invalid Credentials")
+		return "", errors.New("invalid credentials")
 	}
 	match, err := argon2id.ComparePasswordAndHash(password, user.Password)
 	if err != nil {
-		return "", errors.New("Invalid Credentials")
+		return "", errors.New("invalid credentials")
 	}
 	if !match {
-		return "", errors.New("Invalid Credentials")
+		return "", errors.New("invalid credentials")
 	}
 	token, err := cur.GenerateToken(user.ID)
 	if err != nil {
-		return "", errors.New("Invalid Credentials")
+		return "", errors.New("invalid credentials")
 	}
 	return token, nil
 }
@@ -103,7 +103,7 @@ func (cur *AuthenticationService) GenerateToken(user_id uint) (string, error) {
 func (cur *AuthenticationService) VerifyToken(token string) (uint, error) {
 	token_parts := strings.Split(token, "_")
 	if len(token_parts) != 3 {
-		return 0, errors.New("Bad token")
+		return 0, errors.New("bad token")
 	}
 	provided_signature, err := hex.DecodeString(token_parts[2])
 	if err != nil {
@@ -119,7 +119,7 @@ func (cur *AuthenticationService) VerifyToken(token string) (uint, error) {
 	}
 	calculated_signature := hasher.Sum([]byte(""))
 	if !bytes.Equal(calculated_signature, provided_signature) {
-		return 0, errors.New("Token integrity check failed")
+		return 0, errors.New("token integrity check failed")
 	}
 	user_id, err := strconv.ParseUint(token_parts[0], 10, 32)
 	if err != nil {
@@ -130,7 +130,7 @@ func (cur *AuthenticationService) VerifyToken(token string) (uint, error) {
 		return 0, err
 	}
 	if time.Now().Add(-24 * 30 * time.Hour).After(time.Unix(ts, 0)) {
-		return 0, errors.New("Token expired")
+		return 0, errors.New("token expired")
 	}
 	return uint(user_id), nil
 }

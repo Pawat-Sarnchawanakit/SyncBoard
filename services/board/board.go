@@ -435,18 +435,6 @@ type BoardResponse struct {
 	CreatedAt   time.Time
 }
 
-func boardToResponse(board *models.Board) *BoardResponse {
-	return &BoardResponse{
-		ID:          board.ID,
-		Title:       board.Title,
-		Description: board.Description,
-		Tags:        board.Tags,
-		OwnerID:     board.OwnerID,
-		TeamID:      board.TeamID,
-		CreatedAt:   board.CreatedAt,
-	}
-}
-
 func (s *BoardService) UpdateBoard(id uint, userID uint, title, description, tags string) (*BoardInfo, error) {
 	datastore := s.app.GetDatastore()
 	board := models.Board{}
@@ -907,7 +895,6 @@ func (s *BoardService) GetBoardMembersPaginated(boardID uint, offset, limit int)
 			Username: ownerUser.Username,
 			Role:     models.RoleOwner,
 		})
-		offset--
 		limit--
 	}
 
@@ -921,7 +908,6 @@ func (s *BoardService) GetBoardMembersPaginated(boardID uint, offset, limit int)
 			Username: m.Username,
 			Role:     m.Role,
 		})
-		limit--
 	}
 
 	return members, int(total), nil
@@ -952,14 +938,6 @@ func (s *BoardService) GetUserPermission(boardID uint, userID uint) (string, err
 	}
 
 	return member.Role, nil
-}
-
-type boardTitleInfo struct {
-	Title       string
-	Description string
-	OwnerID     uint
-	TeamID      uint
-	Role        string
 }
 
 func (s *BoardService) GetBoardTitleAndPermission(boardID uint, userID uint) (string, string, error) {

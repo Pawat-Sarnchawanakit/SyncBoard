@@ -19,10 +19,7 @@ func IsAuthenticated(app App, c *gin.Context) bool {
 		return false
 	}
 	_, err = app.GetServices().AuthenticationService.VerifyToken(token)
-	if err != nil {
-		return false
-	}
-	return true
+	return err == nil
 }
 
 func signUpHandler(app App, c *gin.Context) {
