@@ -119,4 +119,73 @@ func RegisterHandlers(app App) {
 	router.POST("/api/login", func(c *gin.Context) { loginHandler(app, c) })
 	router.POST("/api/logout", func(c *gin.Context) { logoutHandler(app, c) })
 	router.GET("/api/users/search", func(c *gin.Context) { searchUsersHandler(app, c) })
+
+	router.POST("/api/settings/password", func(c *gin.Context) { changePasswordHandler(app, c) })
+	router.DELETE("/api/settings/account", func(c *gin.Context) { deleteAccountHandler(app, c) })
+}
+
+func getUserIDFromContext(app App, c *gin.Context) (uint, bool) {
+	token, err := c.Cookie("tk")
+	if err != nil {
+		return 0, false
+	}
+	userID, err := app.GetServices().AuthenticationService.VerifyToken(token)
+	if err != nil {
+		return 0, false
+	}
+	return userID, true
+}
+
+func changePasswordHandler(app App, c *gin.Context) {
+	userID, ok := getUserIDFromContext(app, c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	type ChangePasswordRequest struct {
+		CurrentPassword string `json:"currentPassword" binding:"required,min=8,max=128"`
+		NewPassword     string `json:"newPassword" binding:"required,min=8,max=128"`
+	}
+
+	var req ChangePasswordRequest
+	if err := c.BindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	err := app.GetServices().AuthenticationService.ChangePassword(userID, req.CurrentPassword, req.NewPassword)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "password changed successfully"})
+}
+
+func deleteAccountHandler(app App, c *gin.Context) {
+	userID, ok := getUserIDFromContext(app, c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	type DeleteAccountRequest struct {
+		Password string `json:"password" binding:"required,min=8,max=128"`
+	}
+
+	var req DeleteAccountRequest
+	if err := c.BindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	err := app.GetServices().AuthenticationService.DeleteUser(userID, req.Password)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.SetCookie("tk", "", -1, "/", "", false, false)
+	c.JSON(http.StatusOK, gin.H{"message": "account deleted successfully"})
 }

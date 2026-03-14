@@ -81,6 +81,21 @@
         background-color: #0056b3;
       }
 
+      .logout-btn {
+        background-color: #6c757d;
+        color: white;
+        border: none;
+        padding: 0.5rem 1rem;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: 500;
+        transition: background-color 0.3s ease;
+      }
+
+      .logout-btn:hover {
+        background-color: #5a6268;
+      }
+
       /* Main content */
       .main-content {
         max-width: 1200px;
@@ -217,12 +232,12 @@
         <li><a class="selected"><i data-feather="home" style="width:16px;height:16px;vertical-align:middle;margin-right:4px;"></i>Home</a></li>
           <li><a href="/{{if .Authenticated}}myboards{{else}}login{{end}}"><i data-feather="grid" style="width:16px;height:16px;vertical-align:middle;margin-right:4px;"></i>My Boards</a></li>
           <li><a href="/{{if .Authenticated}}teams{{else}}login{{end}}"><i data-feather="users" style="width:16px;height:16px;vertical-align:middle;margin-right:4px;"></i>Teams</a></li>
-          <li><a href="#settings"><i data-feather="settings" style="width:16px;height:16px;vertical-align:middle;margin-right:4px;"></i>Settings</a></li>
+          <li><a href="/settings"><i data-feather="settings" style="width:16px;height:16px;vertical-align:middle;margin-right:4px;"></i>Settings</a></li>
         </ul>
       </nav>
       <div class="auth-buttons">
         {{if .Authenticated}}
-        <button onclick="logout()" class="login-btn"><i data-feather="log-out" style="width:16px;height:16px;vertical-align:middle;margin-right:4px;"></i>Logout</button>
+        <button onclick="logout()" class="logout-btn"><i data-feather="log-out" style="width:16px;height:16px;vertical-align:middle;margin-right:4px;"></i>Logout</button>
         {{else}}
         <a href="/login"><button class="login-btn"><i data-feather="log-in" style="width:16px;height:16px;vertical-align:middle;margin-right:4px;"></i>Login</button></a>
         {{end}}

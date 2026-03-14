@@ -153,6 +153,73 @@ func (cur *AuthenticationService) GetUserByUsername(username string) (*models.Us
 	return &user, nil
 }
 
+func (cur *AuthenticationService) ChangePassword(userID uint, currentPassword, newPassword string) error {
+	datastore := cur.app.GetDatastore()
+
+	user := models.User{}
+	if err := datastore.GormDB.First(&user, userID).Error; err != nil {
+		return errors.New("user not found")
+	}
+
+	match, err := argon2id.ComparePasswordAndHash(currentPassword, user.Password)
+	if err != nil {
+		return errors.New("invalid current password")
+	}
+	if !match {
+		return errors.New("invalid current password")
+	}
+
+	hash, err := argon2id.CreateHash(newPassword, argon2id_params)
+	if err != nil {
+		return err
+	}
+
+	if err := datastore.GormDB.Model(&user).Update("password", hash).Error; err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (cur *AuthenticationService) DeleteUser(userID uint, password string) error {
+	datastore := cur.app.GetDatastore()
+
+	user := models.User{}
+	if err := datastore.GormDB.First(&user, userID).Error; err != nil {
+		return errors.New("user not found")
+	}
+
+	match, err := argon2id.ComparePasswordAndHash(password, user.Password)
+	if err != nil {
+		return errors.New("invalid password")
+	}
+	if !match {
+		return errors.New("invalid password")
+	}
+
+	if err := datastore.GormDB.Where("owner_id = ?", userID).Delete(&models.Board{}).Error; err != nil {
+		return err
+	}
+
+	if err := datastore.GormDB.Where("user_id = ?", userID).Delete(&models.BoardMember{}).Error; err != nil {
+		return err
+	}
+
+	if err := datastore.GormDB.Where("owner_id = ?", userID).Delete(&models.Team{}).Error; err != nil {
+		return err
+	}
+
+	if err := datastore.GormDB.Where("user_id = ?", userID).Delete(&models.TeamMember{}).Error; err != nil {
+		return err
+	}
+
+	if err := datastore.GormDB.Delete(&user).Error; err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (cur *AuthenticationService) SearchUsers(query string, limit int) ([]models.User, error) {
 	datastore := cur.app.GetDatastore()
 	var users []models.User

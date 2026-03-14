@@ -91,6 +91,13 @@ func RegisterHandlers(app App) {
 		}
 		c.HTML(http.StatusOK, "teams.html", gin.H{})
 	})
+	router.GET("/settings", func(c *gin.Context) {
+		if !auth.IsAuthenticated(app, c) {
+			c.Redirect(http.StatusTemporaryRedirect, "/login")
+			return
+		}
+		c.HTML(http.StatusOK, "settings.html", gin.H{})
+	})
 	router.GET("/team/:id", func(c *gin.Context) {
 		if !auth.IsAuthenticated(app, c) {
 			c.Redirect(http.StatusTemporaryRedirect, "/login")

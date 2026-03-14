@@ -1,0 +1,362 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Settings - SyncBoard</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background-color: #f8f9fa;
+        color: #333;
+        line-height: 1.6;
+      }
+
+      .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem 2rem;
+        background-color: #ffffff;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        position: sticky;
+        top: 0;
+        z-index: 100;
+      }
+
+      .logo h1 {
+        color: #007bff;
+        font-size: 1.5rem;
+        font-weight: 700;
+      }
+
+      .nav ul {
+        display: flex;
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+
+      .nav ul li {
+        margin: 0 1rem;
+      }
+
+      .nav ul li a {
+        text-decoration: none;
+        color: #333;
+        font-weight: 500;
+        transition: color 0.3s ease;
+        display: flex;
+        align-items: center;
+      }
+
+      .nav ul li a:hover {
+        color: #007bff;
+      }
+
+      .nav ul li a.selected {
+        color: #003bff;
+      }
+
+      .logout-btn {
+        background-color: #6c757d;
+        color: white;
+        border: none;
+        padding: 0.5rem 1rem;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: 500;
+        transition: background-color 0.3s ease;
+      }
+
+      .logout-btn:hover {
+        background-color: #5a6268;
+      }
+
+      .main-content {
+        max-width: 600px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+      }
+
+      .settings-section {
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+      }
+
+      .settings-section h2 {
+        margin-bottom: 1rem;
+        color: #333;
+        font-size: 1.25rem;
+      }
+
+      .form-group {
+        margin-bottom: 1rem;
+      }
+
+      .form-group label {
+        display: block;
+        margin-bottom: 0.5rem;
+        font-weight: 500;
+        color: #555;
+      }
+
+      .form-group input {
+        width: 100%;
+        padding: 0.75rem;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 1rem;
+      }
+
+      .form-group input:focus {
+        outline: none;
+        border-color: #007bff;
+      }
+
+      .btn {
+        padding: 0.75rem 1.5rem;
+        border: none;
+        border-radius: 4px;
+        font-size: 1rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: background-color 0.2s;
+      }
+
+      .btn-primary {
+        background-color: #007bff;
+        color: white;
+      }
+
+      .btn-primary:hover {
+        background-color: #0056b3;
+      }
+
+      .btn-primary:disabled {
+        background-color: #ccc;
+        cursor: not-allowed;
+      }
+
+      .btn-danger {
+        background-color: #dc3545;
+        color: white;
+      }
+
+      .btn-danger:hover {
+        background-color: #c82333;
+      }
+
+      .btn-danger:disabled {
+        background-color: #ccc;
+        cursor: not-allowed;
+      }
+
+      .error-message {
+        color: #dc3545;
+        font-size: 0.875rem;
+        margin-top: 0.2rem;
+        margin-bottom: 0.2rem;
+        display: none;
+      }
+
+      .success-message {
+        color: #28a745;
+        font-size: 0.875rem;
+        margin-top: 0.5rem;
+        display: none;
+      }
+
+      .danger-zone {
+        border: 2px solid #dc3545;
+      }
+
+      .danger-zone h2 {
+        color: #dc3545;
+      }
+
+      .delete-warning {
+        color: #721c24;
+        background-color: #f8d7da;
+        border: 1px solid #f5c6cb;
+        padding: 0.75rem;
+        border-radius: 4px;
+        margin-bottom: 1rem;
+        font-size: 0.875rem;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="header">
+      <div class="logo"><a href="/" style="text-decoration: none;"><h1>SyncBoard</h1></a></div>
+      <nav class="nav">
+        <ul>
+          <li><a href="/"><i data-feather="home" style="width:16px;height:16px;vertical-align:middle;margin-right:4px;"></i>Home</a></li>
+          <li><a href="/myboards"><i data-feather="grid" style="width:16px;height:16px;vertical-align:middle;margin-right:4px;"></i>My Boards</a></li>
+          <li><a href="/teams"><i data-feather="users" style="width:16px;height:16px;vertical-align:middle;margin-right:4px;"></i>Teams</a></li>
+          <li><a class="selected"><i data-feather="settings" style="width:16px;height:16px;vertical-align:middle;margin-right:4px;"></i>Settings</a></li>
+        </ul>
+      </nav>
+      <button onclick="logout()" class="logout-btn"><i data-feather="log-out" style="width:16px;height:16px;"></i>Logout</button>
+    </header>
+
+    <main class="main-content">
+      <div class="settings-section">
+        <h2>Change Password</h2>
+        <form id="changePasswordForm">
+          <div class="form-group">
+            <label for="currentPassword">Current Password</label>
+            <input type="password" id="currentPassword" name="currentPassword" required minlength="8" maxlength="128">
+          </div>
+          <div class="form-group">
+            <label for="newPassword">New Password</label>
+            <input type="password" id="newPassword" name="newPassword" required minlength="8" maxlength="128">
+          </div>
+          <div class="form-group">
+            <label for="confirmPassword">Confirm New Password</label>
+            <input type="password" id="confirmPassword" name="confirmPassword" required minlength="8" maxlength="128">
+          </div>
+          <div id="passwordError" class="error-message"></div>
+          <div id="passwordSuccess" class="success-message"></div>
+          <button type="submit" id="changePasswordBtn" class="btn btn-primary">Change Password</button>
+        </form>
+      </div>
+
+      <div class="settings-section danger-zone">
+        <h2>Delete Account</h2>
+        <div class="delete-warning">
+          Warning: This action cannot be undone. All your boards will be permanently deleted.
+        </div>
+        <form id="deleteAccountForm">
+          <div class="form-group">
+            <label for="deletePassword">Enter your password to confirm</label>
+            <input type="password" id="deletePassword" name="deletePassword" required minlength="8" maxlength="128">
+          </div>
+          <div id="deleteError" class="error-message"></div>
+          <div id="deleteSuccess" class="success-message"></div>
+          <button type="submit" id="deleteAccountBtn" class="btn btn-danger">Delete My Account</button>
+        </form>
+      </div>
+    </main>
+
+    <script src="https://unpkg.com/feather-icons"></script>
+    <script>
+      feather.replace();
+
+      function logout() {
+        fetch('/api/logout', { method: 'POST' })
+          .then(() => {
+            window.location.href = '/login';
+          });
+      }
+
+      document.getElementById('changePasswordForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const currentPassword = document.getElementById('currentPassword').value;
+        const newPassword = document.getElementById('newPassword').value;
+        const confirmPassword = document.getElementById('confirmPassword').value;
+        const errorEl = document.getElementById('passwordError');
+        const successEl = document.getElementById('passwordSuccess');
+        const btn = document.getElementById('changePasswordBtn');
+
+        errorEl.style.display = 'none';
+        successEl.style.display = 'none';
+
+        if (newPassword !== confirmPassword) {
+          errorEl.textContent = 'New passwords do not match';
+          errorEl.style.display = 'block';
+          return;
+        }
+
+        if (newPassword.length < 8) {
+          errorEl.textContent = 'Password must be at least 8 characters';
+          errorEl.style.display = 'block';
+          return;
+        }
+
+        btn.disabled = true;
+        btn.textContent = 'Changing...';
+
+        try {
+          const response = await fetch('/api/settings/password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              currentPassword: currentPassword,
+              newPassword: newPassword
+            })
+          });
+
+          const data = await response.json();
+
+          if (response.ok) {
+            successEl.textContent = 'Password changed successfully';
+            successEl.style.display = 'block';
+            document.getElementById('changePasswordForm').reset();
+          } else {
+            errorEl.textContent = data.error || 'Failed to change password';
+            errorEl.style.display = 'block';
+          }
+        } catch (err) {
+          errorEl.textContent = 'An error occurred';
+          errorEl.style.display = 'block';
+        } finally {
+          btn.disabled = false;
+          btn.textContent = 'Change Password';
+        }
+      });
+
+      document.getElementById('deleteAccountForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const password = document.getElementById('deletePassword').value;
+        const errorEl = document.getElementById('deleteError');
+        const successEl = document.getElementById('deleteSuccess');
+        const btn = document.getElementById('deleteAccountBtn');
+
+        if (!confirm('Are you sure you want to delete your account? This cannot be undone.')) {
+          return;
+        }
+
+        errorEl.style.display = 'none';
+        successEl.style.display = 'none';
+
+        btn.disabled = true;
+        btn.textContent = 'Deleting...';
+
+        try {
+          const response = await fetch('/api/settings/account', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password: password })
+          });
+
+          const data = await response.json();
+
+          if (response.ok) {
+            window.location.href = '/login';
+          } else {
+            errorEl.textContent = data.error || 'Failed to delete account';
+            errorEl.style.display = 'block';
+          }
+        } catch (err) {
+          errorEl.textContent = 'An error occurred';
+          errorEl.style.display = 'block';
+        } finally {
+          btn.disabled = false;
+          btn.textContent = 'Delete My Account';
+        }
+      });
+    </script>
+  </body>
+</html>
