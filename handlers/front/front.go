@@ -113,12 +113,7 @@ func RegisterHandlers(app App) {
 			return
 		}
 
-		if !app.GetServices().TeamService.IsTeamMember(uint(teamID), userID) {
-			c.Redirect(http.StatusTemporaryRedirect, "/teams")
-			return
-		}
-
-		team, err := app.GetServices().TeamService.GetTeam(uint(teamID))
+		team, err := app.GetServices().TeamService.GetTeamByIDAndMember(uint(teamID), userID)
 		if err != nil {
 			c.Redirect(http.StatusTemporaryRedirect, "/teams")
 			return

@@ -148,7 +148,7 @@ func (cm *CanvasManager) ApplyText(boardID uint, x, y float64, textStr, col stri
 	fontSize := size * 2
 
 	if data.Font != nil {
-		cv.SetFont(data.Font, fontSize * 1.3)
+		cv.SetFont(data.Font, fontSize*1.3)
 	} else {
 		return
 	}
@@ -273,6 +273,95 @@ func NewBoardService(app App) (*BoardService, error) {
 	return s, nil
 }
 
+func (s *BoardService) getTeamBoard(boardID uint) (*models.TeamBoard, error) {
+	datastore := s.app.GetDatastore()
+	var teamBoard models.TeamBoard
+	err := datastore.GormDB.Where("board_id = ?", boardID).First(&teamBoard).Error
+	if err != nil {
+		return nil, err
+	}
+	return &teamBoard, nil
+}
+
+func (s *BoardService) IsTeamBoard(boardID uint) bool {
+	_, err := s.getTeamBoard(boardID)
+	return err == nil
+}
+
+func (s *BoardService) GetTeamBoardOwnerID(boardID uint) (uint, error) {
+	teamBoard, err := s.getTeamBoard(boardID)
+	if err != nil {
+		return 0, err
+	}
+	return teamBoard.BoardOwnerID, nil
+}
+
+func (s *BoardService) CanGrantPermission(boardID uint, userID uint) (bool, error) {
+	board, err := s.GetBoard(boardID)
+	if err != nil {
+		return false, err
+	}
+
+	if board.TeamID == 0 {
+		return false, errors.New("not a team board")
+	}
+
+	teamBoard, err := s.getTeamBoard(boardID)
+	if err != nil {
+		return false, err
+	}
+
+	if teamBoard.BoardOwnerID == userID {
+		return teamBoard.CanGrantPermission, nil
+	}
+
+	return false, errors.New("not the board owner")
+}
+
+func (s *BoardService) CanDelete(boardID uint, userID uint) (bool, error) {
+	board, err := s.GetBoard(boardID)
+	if err != nil {
+		return false, err
+	}
+
+	if board.TeamID == 0 {
+		return false, errors.New("not a team board")
+	}
+
+	teamBoard, err := s.getTeamBoard(boardID)
+	if err != nil {
+		return false, err
+	}
+
+	if teamBoard.BoardOwnerID == userID {
+		return teamBoard.CanDelete, nil
+	}
+
+	return false, errors.New("not the board owner")
+}
+
+func (s *BoardService) CanEditMetadata(boardID uint, userID uint) (bool, error) {
+	board, err := s.GetBoard(boardID)
+	if err != nil {
+		return false, err
+	}
+
+	if board.TeamID == 0 {
+		return false, errors.New("not a team board")
+	}
+
+	teamBoard, err := s.getTeamBoard(boardID)
+	if err != nil {
+		return false, err
+	}
+
+	if teamBoard.BoardOwnerID == userID {
+		return teamBoard.CanEditMetadata, nil
+	}
+
+	return false, errors.New("not the board owner")
+}
+
 func parseTags(tags string) []string {
 	if tags == "" {
 		return []string{}
@@ -324,11 +413,31 @@ type UpdateBoardInput struct {
 	Tags        *string
 }
 
-func (s *BoardService) UpdateBoard(id uint, ownerID uint, input UpdateBoardInput) (*models.Board, error) {
+func (s *BoardService) UpdateBoard(id uint, userID uint, input UpdateBoardInput) (*models.Board, error) {
 	datastore := s.app.GetDatastore()
 	board := models.Board{}
-	if err := datastore.GormDB.Where("id = ? AND owner_id = ?", id, ownerID).First(&board).Error; err != nil {
+	if err := datastore.GormDB.First(&board, id).Error; err != nil {
 		return nil, err
+	}
+
+	canEdit := false
+	if board.TeamID == 0 {
+		if board.OwnerID == userID {
+			canEdit = true
+		}
+	} else {
+		if board.OwnerID == userID {
+			canEdit = true
+		} else {
+			canEditMeta, err := s.CanEditMetadata(id, userID)
+			if err == nil && canEditMeta {
+				canEdit = true
+			}
+		}
+	}
+
+	if !canEdit {
+		return nil, errors.New("unauthorized to edit board")
 	}
 
 	if input.Title != nil {
@@ -359,7 +468,7 @@ func (s *BoardService) UpdateBoard(id uint, ownerID uint, input UpdateBoardInput
 	return &board, nil
 }
 
-func (s *BoardService) AddTags(id uint, ownerID uint, newTags []string) (*models.Board, error) {
+func (s *BoardService) AddTags(id uint, userID uint, newTags []string) (*models.Board, error) {
 	if len(newTags) == 0 {
 		return nil, errors.New("at least one tag is required")
 	}
@@ -371,8 +480,28 @@ func (s *BoardService) AddTags(id uint, ownerID uint, newTags []string) (*models
 
 	datastore := s.app.GetDatastore()
 	board := models.Board{}
-	if err := datastore.GormDB.Where("id = ? AND owner_id = ?", id, ownerID).First(&board).Error; err != nil {
+	if err := datastore.GormDB.First(&board, id).Error; err != nil {
 		return nil, err
+	}
+
+	canEdit := false
+	if board.TeamID == 0 {
+		if board.OwnerID == userID {
+			canEdit = true
+		}
+	} else {
+		if board.OwnerID == userID {
+			canEdit = true
+		} else {
+			canEditMeta, err := s.CanEditMetadata(id, userID)
+			if err == nil && canEditMeta {
+				canEdit = true
+			}
+		}
+	}
+
+	if !canEdit {
+		return nil, errors.New("unauthorized to edit board tags")
 	}
 
 	currentTags := parseTags(board.Tags)
@@ -400,9 +529,34 @@ func (s *BoardService) AddTags(id uint, ownerID uint, newTags []string) (*models
 	return &board, nil
 }
 
-func (s *BoardService) DeleteBoard(id uint, ownerID uint) error {
+func (s *BoardService) DeleteBoard(id uint, userID uint) error {
 	datastore := s.app.GetDatastore()
-	result := datastore.GormDB.Where("id = ? AND owner_id = ?", id, ownerID).Delete(&models.Board{})
+	board := models.Board{}
+	if err := datastore.GormDB.First(&board, id).Error; err != nil {
+		return errors.New("board not found")
+	}
+
+	canDelete := false
+	if board.TeamID == 0 {
+		if board.OwnerID == userID {
+			canDelete = true
+		}
+	} else {
+		if board.OwnerID == userID {
+			canDelete = true
+		} else {
+			canDel, err := s.CanDelete(id, userID)
+			if err == nil && canDel {
+				canDelete = true
+			}
+		}
+	}
+
+	if !canDelete {
+		return errors.New("unauthorized to delete board")
+	}
+
+	result := datastore.GormDB.Delete(&board)
 	if result.Error != nil {
 		return result.Error
 	}
@@ -459,9 +613,27 @@ func (s *BoardService) UserRequestAddMember(boardID uint, requestUserID uint, ta
 	if err != nil {
 		return errors.New("board not found")
 	}
-	if board.OwnerID != requestUserID {
-		return errors.New("only owner can add members")
+
+	canGrant := false
+	if board.TeamID == 0 {
+		if board.OwnerID == requestUserID {
+			canGrant = true
+		}
+	} else {
+		if board.OwnerID == requestUserID {
+			canGrant = true
+		} else {
+			canGrantPerm, err := s.CanGrantPermission(boardID, requestUserID)
+			if err == nil && canGrantPerm {
+				canGrant = true
+			}
+		}
 	}
+
+	if !canGrant {
+		return errors.New("unauthorized to grant permissions")
+	}
+
 	if targetUserID == board.OwnerID {
 		return errors.New("cannot add owner as member")
 	}
@@ -490,9 +662,27 @@ func (s *BoardService) UserRequestRemoveMember(boardID uint, requestUserID uint,
 	if err != nil {
 		return errors.New("board not found")
 	}
-	if board.OwnerID != requestUserID {
-		return errors.New("only owner can remove members")
+
+	canGrant := false
+	if board.TeamID == 0 {
+		if board.OwnerID == requestUserID {
+			canGrant = true
+		}
+	} else {
+		if board.OwnerID == requestUserID {
+			canGrant = true
+		} else {
+			canGrantPerm, err := s.CanGrantPermission(boardID, requestUserID)
+			if err == nil && canGrantPerm {
+				canGrant = true
+			}
+		}
 	}
+
+	if !canGrant {
+		return errors.New("unauthorized to remove members")
+	}
+
 	if targetUserID == board.OwnerID {
 		return errors.New("cannot remove owner")
 	}
@@ -513,9 +703,27 @@ func (s *BoardService) UserRequestUpdateMemberRole(boardID uint, requestUserID u
 	if err != nil {
 		return errors.New("board not found")
 	}
-	if board.OwnerID != requestUserID {
-		return errors.New("only owner can update members")
+
+	canGrant := false
+	if board.TeamID == 0 {
+		if board.OwnerID == requestUserID {
+			canGrant = true
+		}
+	} else {
+		if board.OwnerID == requestUserID {
+			canGrant = true
+		} else {
+			canGrantPerm, err := s.CanGrantPermission(boardID, requestUserID)
+			if err == nil && canGrantPerm {
+				canGrant = true
+			}
+		}
 	}
+
+	if !canGrant {
+		return errors.New("unauthorized to update member role")
+	}
+
 	if targetUserID == board.OwnerID {
 		return errors.New("cannot update owner role")
 	}
@@ -541,9 +749,23 @@ func (s *BoardService) GetBoardMembers(boardID uint) ([]memberResponse, error) {
 		return nil, errors.New("board not found")
 	}
 
-	var members []memberResponse
+	type memberWithUser struct {
+		models.BoardMember
+		Username string
+	}
+
+	var boardMembersWithUsers []memberWithUser
+	if err := datastore.GormDB.
+		Joins("JOIN users ON users.id = board_members.user_id").
+		Where("board_members.board_id = ?", boardID).
+		Find(&boardMembersWithUsers).Error; err != nil {
+		return nil, err
+	}
+
 	var ownerUser models.User
 	_ = datastore.GormDB.First(&ownerUser, board.OwnerID)
+
+	var members []memberResponse
 	members = append(members, memberResponse{
 		ID:       board.OwnerID,
 		UserID:   board.OwnerID,
@@ -551,20 +773,11 @@ func (s *BoardService) GetBoardMembers(boardID uint) ([]memberResponse, error) {
 		Role:     models.RoleOwner,
 	})
 
-	var boardMembers []models.BoardMember
-	if err := datastore.GormDB.Where("board_id = ?", boardID).Find(&boardMembers).Error; err != nil {
-		return nil, err
-	}
-
-	for _, m := range boardMembers {
-		var user models.User
-		if err := datastore.GormDB.First(&user, m.UserID).Error; err != nil {
-			continue
-		}
+	for _, m := range boardMembersWithUsers {
 		members = append(members, memberResponse{
 			ID:       m.ID,
 			UserID:   m.UserID,
-			Username: user.Username,
+			Username: m.Username,
 			Role:     m.Role,
 		})
 	}
@@ -579,21 +792,30 @@ func (s *BoardService) GetBoardMembersPaginated(boardID uint, offset, limit int)
 		return nil, 0, errors.New("board not found")
 	}
 
-	var total int64 = 1
-	var ownerUser models.User
-	_ = datastore.GormDB.First(&ownerUser, board.OwnerID)
-
-	var boardMembers []models.BoardMember
-	query := datastore.GormDB.Model(&models.BoardMember{}).Where("board_id = ?", boardID)
-	if err := query.Count(&total).Error; err != nil {
+	var total int64
+	if err := datastore.GormDB.Model(&models.BoardMember{}).Where("board_id = ?", boardID).Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
 
 	total++
 
-	if err := query.Offset(offset).Limit(limit).Find(&boardMembers).Error; err != nil {
+	type memberWithUser struct {
+		models.BoardMember
+		Username string
+	}
+
+	var boardMembersWithUsers []memberWithUser
+	if err := datastore.GormDB.
+		Joins("JOIN users ON users.id = board_members.user_id").
+		Where("board_members.board_id = ?", boardID).
+		Order("board_members.created_at asc").
+		Offset(offset).Limit(limit).
+		Find(&boardMembersWithUsers).Error; err != nil {
 		return nil, 0, err
 	}
+
+	var ownerUser models.User
+	_ = datastore.GormDB.First(&ownerUser, board.OwnerID)
 
 	var members []memberResponse
 
@@ -608,18 +830,14 @@ func (s *BoardService) GetBoardMembersPaginated(boardID uint, offset, limit int)
 		limit--
 	}
 
-	for _, m := range boardMembers {
+	for _, m := range boardMembersWithUsers {
 		if limit <= 0 {
 			break
-		}
-		var user models.User
-		if err := datastore.GormDB.First(&user, m.UserID).Error; err != nil {
-			continue
 		}
 		members = append(members, memberResponse{
 			ID:       m.ID,
 			UserID:   m.UserID,
-			Username: user.Username,
+			Username: m.Username,
 			Role:     m.Role,
 		})
 		limit--
@@ -636,6 +854,13 @@ func (s *BoardService) GetUserPermission(boardID uint, userID uint) (string, err
 
 	if board.OwnerID == userID {
 		return models.RoleOwner, nil
+	}
+
+	if board.TeamID != 0 {
+		teamBoard, err := s.getTeamBoard(boardID)
+		if err == nil && teamBoard.BoardOwnerID == userID {
+			return models.RoleOwner, nil
+		}
 	}
 
 	datastore := s.app.GetDatastore()
@@ -658,6 +883,13 @@ func (s *BoardService) HasViewAccess(boardID uint, userID uint) bool {
 		return true
 	}
 
+	if board.TeamID != 0 {
+		teamBoard, err := s.getTeamBoard(boardID)
+		if err == nil && teamBoard.BoardOwnerID == userID {
+			return true
+		}
+	}
+
 	datastore := s.app.GetDatastore()
 	var member models.BoardMember
 	err = datastore.GormDB.Where("board_id = ? AND user_id = ?", boardID, userID).First(&member).Error
@@ -672,60 +904,34 @@ func (s *BoardService) CanEdit(boardID uint, userID uint) bool {
 	return permission == models.RoleOwner || permission == models.RoleEditor
 }
 
-func (s *BoardService) GetUserBoardsWithAccess(userID uint, offset, limit int) ([]models.Board, int, error) {
+type userBoardInfo struct {
+	Title            string
+	Description      string
+	Tags             string
+	ID               uint
+	OwnerID          uint
+	TeamBoardOwnerID uint
+	Role             string
+	TeamID           uint
+	CreatedAt        time.Time
+}
+
+func (s *BoardService) GetUserBoardsWithAccess(userID uint, offset, limit int) ([]userBoardInfo, error) {
 	datastore := s.app.GetDatastore()
 
-	var ownedCount int64
-	if err := datastore.GormDB.Model(&models.Board{}).Where("owner_id = ?", userID).Count(&ownedCount).Error; err != nil {
-		return nil, 0, err
+	var boardInfos []userBoardInfo
+	if err := datastore.GormDB.
+		Model(&models.Board{}).
+		Select("boards.title as title, boards.description as description, boards.tags as tags, boards.id as id, boards.owner_id as owner_id, team_boards.board_owner_id as team_board_owner_id, board_members.role as role, team_boards.team_id as team_id, boards.created_at as created_at").
+		Joins("LEFT JOIN board_members ON boards.id = board_members.id").
+		Joins("LEFT JOIN team_boards on boards.id = team_boards.board_id").
+		Where("boards.owner_id = ?", userID).
+		Or("board_members.user_id = ?", userID).
+		Or("team_boards.board_owner_id = ?", userID).
+		Scan(&boardInfos).Error; err != nil {
+		return nil, err
 	}
-
-	var sharedBoardIDs []uint
-	var members []models.BoardMember
-	if err := datastore.GormDB.Where("user_id = ?", userID).Find(&members).Error; err != nil {
-		return nil, 0, err
-	}
-	for _, m := range members {
-		sharedBoardIDs = append(sharedBoardIDs, m.BoardID)
-	}
-
-	var sharedCount int64
-	if len(sharedBoardIDs) > 0 {
-		datastore.GormDB.Model(&models.Board{}).Where("id IN ?", sharedBoardIDs).Count(&sharedCount)
-	}
-
-	total := ownedCount + sharedCount
-
-	var boards []models.Board
-
-	ownedQuery := datastore.GormDB.Where("owner_id = ?", userID).Order("created_at desc").Offset(offset).Limit(limit)
-	if err := ownedQuery.Find(&boards).Error; err != nil {
-		return nil, 0, err
-	}
-
-	remaining := limit - len(boards)
-	if remaining > 0 && len(sharedBoardIDs) > 0 {
-		sharedOffset := offset - int(ownedCount)
-		if sharedOffset < 0 {
-			sharedOffset = 0
-		}
-		var sharedBoards []models.Board
-		if err := datastore.GormDB.Where("id IN ?", sharedBoardIDs).Order("created_at desc").Offset(sharedOffset).Limit(remaining).Find(&sharedBoards).Error; err != nil {
-			return nil, 0, err
-		}
-		boards = append(boards, sharedBoards...)
-	} else if offset < int(ownedCount) && len(sharedBoardIDs) > 0 && offset+limit > int(ownedCount) {
-		overlap := offset + limit - int(ownedCount)
-		if overlap > 0 {
-			var sharedBoards []models.Board
-			if err := datastore.GormDB.Where("id IN ?", sharedBoardIDs).Order("created_at desc").Limit(overlap).Find(&sharedBoards).Error; err != nil {
-				return nil, 0, err
-			}
-			boards = append(boards, sharedBoards...)
-		}
-	}
-
-	return boards, int(total), nil
+	return boardInfos, nil
 }
 
 type Hub struct {

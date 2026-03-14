@@ -24,6 +24,10 @@ type TeamMember struct {
 
 type TeamBoard struct {
 	gorm.Model
-	TeamID  uint `gorm:"not null;index"`
-	BoardID uint `gorm:"not null;index"`
+	TeamID             uint `gorm:"not null;index"`
+	BoardID            uint `gorm:"not null;index"`
+	BoardOwnerID       uint `gorm:"not null"`
+	CanGrantPermission bool `gorm:"not null;default:true"`
+	CanDelete          bool `gorm:"not null;default:false"`
+	CanEditMetadata    bool `gorm:"not null;default:false"`
 }

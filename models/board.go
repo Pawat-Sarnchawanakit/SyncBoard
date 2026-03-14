@@ -20,10 +20,7 @@ const (
 
 type BoardMember struct {
 	gorm.Model
-	BoardID            uint   `gorm:"not null;index"`
-	UserID             uint   `gorm:"not null;index"`
-	Role               string `gorm:"size:20;not null;default:'viewer'"`
-	CanGrantPermission bool   `gorm:"not null;default:true"`
-	CanDelete          bool   `gorm:"not null;default:false"`
-	CanEditMetadata    bool   `gorm:"not null;default:false"`
+	BoardID uint   `gorm:"not null;index"`
+	UserID  uint   `gorm:"not null;index"`
+	Role    string `gorm:"size:20;not null;default:'viewer'"`
 }

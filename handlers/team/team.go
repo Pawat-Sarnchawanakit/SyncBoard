@@ -57,14 +57,16 @@ type MemberResponse struct {
 }
 
 type TeamBoardResponse struct {
-	ID          uint   `json:"id"`
-	Title       string `json:"title"`
-	Description string `json:"description"`
-	Tags        string `json:"tags"`
-	OwnerID     uint   `json:"ownerId"`
-	OwnerName   string `json:"ownerName"`
-	TeamID      uint   `json:"teamId"`
-	CreatedAt   string `json:"createdAt"`
+	ID             uint   `json:"id"`
+	Title          string `json:"title"`
+	Description    string `json:"description"`
+	Tags           string `json:"tags"`
+	OwnerID        uint   `json:"ownerId"`
+	OwnerName      string `json:"ownerName"`
+	TeamID         uint   `json:"teamId"`
+	BoardOwnerID   *uint  `json:"boardOwnerId,omitempty"`
+	BoardOwnerName string `json:"boardOwnerName,omitempty"`
+	CreatedAt      string `json:"createdAt"`
 }
 
 func getUserID(app App, c *gin.Context) (uint, bool) {
@@ -470,7 +472,7 @@ func getTeamBoardsHandler(app App, c *gin.Context) {
 		offset = 0
 	}
 
-	boards, total, err := app.GetServices().TeamService.GetTeamBoards(uint(teamID), offset, limit)
+	boards, err := app.GetServices().TeamService.GetTeamBoards(uint(teamID), offset, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -478,22 +480,21 @@ func getTeamBoardsHandler(app App, c *gin.Context) {
 
 	var response []TeamBoardResponse
 	for _, b := range boards {
-		response = append(response, TeamBoardResponse{
-			ID:          b.ID,
+		boardResp := TeamBoardResponse{
+			ID:          b.BoardID,
 			Title:       b.Title,
 			Description: b.Description,
 			Tags:        b.Tags,
 			OwnerID:     b.OwnerID,
 			OwnerName:   b.OwnerName,
-			TeamID:      b.TeamID,
+			TeamID:      uint(teamID),
 			CreatedAt:   b.CreatedAt.Format(time.RFC3339),
-		})
+		}
+		response = append(response, boardResp)
 	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"boards": response,
-		"total":  total,
-		"offset": offset,
 		"limit":  limit,
 	})
 }

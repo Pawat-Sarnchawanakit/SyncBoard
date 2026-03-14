@@ -141,7 +141,7 @@ func getBoardsHandler(app App, c *gin.Context) {
 		offset = 0
 	}
 
-	boards, total, err := app.GetServices().BoardService.GetUserBoardsWithAccess(userID, offset, limit)
+	boards, err := app.GetServices().BoardService.GetUserBoardsWithAccess(userID, offset, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -149,8 +149,6 @@ func getBoardsHandler(app App, c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"boards": boards,
-		"total":  total,
-		"offset": offset,
 		"limit":  limit,
 	})
 }
@@ -202,12 +200,6 @@ func updateBoardHandler(app App, c *gin.Context) {
 		return
 	}
 
-	permission, err := app.GetServices().BoardService.GetUserPermission(uint(boardID), userID)
-	if err != nil || permission != "owner" {
-		c.JSON(http.StatusForbidden, gin.H{"error": "only owner can update board"})
-		return
-	}
-
 	var req UpdateBoardRequest
 	if err := c.BindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -253,12 +245,6 @@ func addTagsHandler(app App, c *gin.Context) {
 		return
 	}
 
-	permission, err := app.GetServices().BoardService.GetUserPermission(uint(boardID), userID)
-	if err != nil || (permission != "owner" && permission != "editor") {
-		c.JSON(http.StatusForbidden, gin.H{"error": "only owner and editors can add tags"})
-		return
-	}
-
 	var req AddTagsRequest
 	if err := c.BindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -290,12 +276,6 @@ func deleteBoardHandler(app App, c *gin.Context) {
 	boardID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid board id"})
-		return
-	}
-
-	permission, err := app.GetServices().BoardService.GetUserPermission(uint(boardID), userID)
-	if err != nil || permission != "owner" {
-		c.JSON(http.StatusForbidden, gin.H{"error": "only owner can delete board"})
 		return
 	}
 

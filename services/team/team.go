@@ -4,6 +4,7 @@ import (
 	"errors"
 	"strings"
 	"sync-board/models"
+	"time"
 )
 
 type App interface {
@@ -190,6 +191,19 @@ func (s *TeamService) GetTeam(id uint) (*models.Team, error) {
 	return &team, nil
 }
 
+func (s *TeamService) GetTeamByIDAndMember(id uint, memberID uint) (*models.Team, error) {
+	datastore := s.app.GetDatastore()
+	team := models.Team{}
+	if err := datastore.GormDB.
+		Model(&models.Team{}).
+		Joins("JOIN team_members ON team_members.team_id = teams.id").
+		Where("teams.id = ? AND team_members.user_id = ?", id, memberID).
+		Take(&team).Error; err != nil {
+		return nil, err
+	}
+	return &team, nil
+}
+
 func (s *TeamService) GetTeamByIDAndOwner(id uint, ownerID uint) (*models.Team, error) {
 	datastore := s.app.GetDatastore()
 	team := models.Team{}
@@ -227,10 +241,24 @@ func (s *TeamService) GetTeamMembers(teamID uint) ([]teamMemberResponse, error) 
 		return nil, errors.New("team not found")
 	}
 
-	var members []teamMemberResponse
+	type memberWithUser struct {
+		models.TeamMember
+		Username string
+	}
+
+	var teamMembersWithUsers []memberWithUser
+	if err := datastore.GormDB.
+		Model(models.TeamMember{}).
+		Joins("JOIN users ON users.id = team_members.user_id").
+		Where("team_members.team_id = ?", teamID).
+		Find(&teamMembersWithUsers).Error; err != nil {
+		return nil, err
+	}
 
 	var ownerUser models.User
 	_ = datastore.GormDB.First(&ownerUser, team.OwnerID)
+
+	var members []teamMemberResponse
 	members = append(members, teamMemberResponse{
 		ID:       team.OwnerID,
 		UserID:   team.OwnerID,
@@ -238,23 +266,14 @@ func (s *TeamService) GetTeamMembers(teamID uint) ([]teamMemberResponse, error) 
 		Role:     models.TeamRoleOwner,
 	})
 
-	var teamMembers []models.TeamMember
-	if err := datastore.GormDB.Where("team_id = ?", teamID).Find(&teamMembers).Error; err != nil {
-		return nil, err
-	}
-
-	for _, m := range teamMembers {
+	for _, m := range teamMembersWithUsers {
 		if m.UserID == team.OwnerID {
-			continue
-		}
-		var user models.User
-		if err := datastore.GormDB.First(&user, m.UserID).Error; err != nil {
 			continue
 		}
 		members = append(members, teamMemberResponse{
 			ID:       m.ID,
 			UserID:   m.UserID,
-			Username: user.Username,
+			Username: m.Username,
 			Role:     m.Role,
 		})
 	}
@@ -269,21 +288,31 @@ func (s *TeamService) GetTeamMembersPaginated(teamID uint, offset, limit int) ([
 		return nil, 0, errors.New("team not found")
 	}
 
-	var total int64 = 1
-	var ownerUser models.User
-	_ = datastore.GormDB.First(&ownerUser, team.OwnerID)
-
-	var teamMembers []models.TeamMember
-	query := datastore.GormDB.Model(&models.TeamMember{}).Where("team_id = ?", teamID)
-	if err := query.Count(&total).Error; err != nil {
+	var total int64
+	if err := datastore.GormDB.Model(&models.TeamMember{}).Where("team_id = ?", teamID).Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
 
 	total++
 
-	if err := query.Offset(offset).Limit(limit).Find(&teamMembers).Error; err != nil {
+	type memberWithUser struct {
+		models.TeamMember
+		Username string
+	}
+
+	var teamMembersWithUsers []memberWithUser
+	if err := datastore.GormDB.
+		Model(&models.TeamMember{}).
+		Joins("JOIN users ON users.id = team_members.user_id").
+		Where("team_members.team_id = ?", teamID).
+		Order("team_members.created_at asc").
+		Offset(offset).Limit(limit).
+		Find(&teamMembersWithUsers).Error; err != nil {
 		return nil, 0, err
 	}
+
+	var ownerUser models.User
+	_ = datastore.GormDB.First(&ownerUser, team.OwnerID)
 
 	var members []teamMemberResponse
 
@@ -298,21 +327,17 @@ func (s *TeamService) GetTeamMembersPaginated(teamID uint, offset, limit int) ([
 		limit--
 	}
 
-	for _, m := range teamMembers {
+	for _, m := range teamMembersWithUsers {
 		if limit <= 0 {
 			break
 		}
 		if m.UserID == team.OwnerID {
 			continue
 		}
-		var user models.User
-		if err := datastore.GormDB.First(&user, m.UserID).Error; err != nil {
-			continue
-		}
 		members = append(members, teamMemberResponse{
 			ID:       m.ID,
 			UserID:   m.UserID,
-			Username: user.Username,
+			Username: m.Username,
 			Role:     m.Role,
 		})
 		limit--
@@ -411,9 +436,6 @@ func (s *TeamService) CreateTeamBoard(teamID uint, targetUserID uint, title, des
 	if !s.IsTeamMember(teamID, targetUserID) {
 		return nil, errors.New("target user must be a team member")
 	}
-	if targetUserID == team.OwnerID {
-		return nil, errors.New("cannot create board for owner")
-	}
 
 	if title == "" {
 		return nil, errors.New("title is required")
@@ -442,20 +464,21 @@ func (s *TeamService) CreateTeamBoard(teamID uint, targetUserID uint, title, des
 	}
 
 	teamBoard := models.TeamBoard{
-		TeamID:  teamID,
-		BoardID: board.ID,
+		TeamID:             teamID,
+		BoardID:            board.ID,
+		BoardOwnerID:       targetUserID,
+		CanGrantPermission: true,
+		CanDelete:          false,
+		CanEditMetadata:    false,
 	}
 	if err := datastore.GormDB.Create(&teamBoard).Error; err != nil {
 		return nil, err
 	}
 
 	member := models.BoardMember{
-		BoardID:            board.ID,
-		UserID:             targetUserID,
-		Role:               models.RoleEditor,
-		CanGrantPermission: true,
-		CanDelete:          false,
-		CanEditMetadata:    false,
+		BoardID: board.ID,
+		UserID:  targetUserID,
+		Role:    models.RoleEditor,
 	}
 	if err := datastore.GormDB.Create(&member).Error; err != nil {
 		return nil, err
@@ -465,62 +488,38 @@ func (s *TeamService) CreateTeamBoard(teamID uint, targetUserID uint, title, des
 }
 
 type TeamBoardWithOwner struct {
-	models.Board
-	OwnerName string `json:"ownerName"`
+	BoardID      uint
+	Title        string
+	Description  string
+	Tags         string
+	OwnerID      uint
+	OwnerName    string
+	BoardOwnerID uint
+	CreatedAt    time.Time
 }
 
-func (s *TeamService) GetTeamBoards(teamID uint, offset, limit int) ([]TeamBoardWithOwner, int, error) {
+func (s *TeamService) GetTeamBoards(teamID uint, offset, limit int) ([]TeamBoardWithOwner, error) {
 	datastore := s.app.GetDatastore()
 
 	_, err := s.GetTeam(teamID)
 	if err != nil {
-		return nil, 0, errors.New("team not found")
+		return nil, errors.New("team not found")
 	}
 
-	var total int64
-	var teamBoards []models.TeamBoard
-	query := datastore.GormDB.Model(&models.TeamBoard{}).Where("team_id = ?", teamID)
-	if err := query.Count(&total).Error; err != nil {
-		return nil, 0, err
+	var boardResults []TeamBoardWithOwner
+	if err := datastore.GormDB.
+		Model(&models.TeamBoard{}).
+		Select("boards.id as board_id, boards.created_at as created_at, users.username as owner_name, *").
+		Joins("JOIN boards ON boards.id = team_boards.board_id").
+		Joins("JOIN users ON team_boards.board_owner_id = users.id").
+		Where("team_boards.team_id = ?", teamID).
+		Order("team_boards.created_at desc").
+		Offset(offset).Limit(limit).
+		Scan(&boardResults).Error; err != nil {
+		return nil, err
 	}
 
-	if err := query.Offset(offset).Limit(limit).Find(&teamBoards).Error; err != nil {
-		return nil, 0, err
-	}
-
-	if len(teamBoards) == 0 {
-		return []TeamBoardWithOwner{}, int(total), nil
-	}
-
-	boardIDs := make([]uint, len(teamBoards))
-	for i, tb := range teamBoards {
-		boardIDs[i] = tb.BoardID
-	}
-
-	var boards []models.Board
-	if err := datastore.GormDB.Where("id IN ?", boardIDs).Find(&boards).Error; err != nil {
-		return nil, 0, err
-	}
-
-	var ownerUsers = make(map[uint]string)
-	for _, b := range boards {
-		if _, ok := ownerUsers[b.OwnerID]; !ok {
-			var user models.User
-			if err := datastore.GormDB.First(&user, b.OwnerID).Error; err == nil {
-				ownerUsers[b.OwnerID] = user.Username
-			}
-		}
-	}
-
-	var result []TeamBoardWithOwner
-	for _, b := range boards {
-		result = append(result, TeamBoardWithOwner{
-			Board:     b,
-			OwnerName: ownerUsers[b.OwnerID],
-		})
-	}
-
-	return result, int(total), nil
+	return boardResults, nil
 }
 
 func (s *TeamService) GetUserTeams(userID uint, offset, limit int) ([]models.Team, int, error) {
@@ -578,15 +577,15 @@ func (s *TeamService) GetUserTeams(userID uint, offset, limit int) ([]models.Tea
 
 func (s *TeamService) GetTeamBoardMemberRestrictions(boardID uint, userID uint) (*BoardRestrictions, error) {
 	datastore := s.app.GetDatastore()
-	var member models.BoardMember
-	err := datastore.GormDB.Where("board_id = ? AND user_id = ?", boardID, userID).First(&member).Error
+	var teamBoard models.TeamBoard
+	err := datastore.GormDB.Where("board_id = ?", boardID).First(&teamBoard).Error
 	if err != nil {
-		return nil, errors.New("member not found")
+		return nil, errors.New("team board not found")
 	}
 	return &BoardRestrictions{
-		CanGrantPermission: member.CanGrantPermission,
-		CanDelete:          member.CanDelete,
-		CanEditMetadata:    member.CanEditMetadata,
+		CanGrantPermission: teamBoard.CanGrantPermission,
+		CanDelete:          teamBoard.CanDelete,
+		CanEditMetadata:    teamBoard.CanEditMetadata,
 	}, nil
 }
 
@@ -609,17 +608,17 @@ func (s *TeamService) UpdateTeamBoardMemberRestrictions(boardID uint, userID uin
 		return errors.New("only team owner can update restrictions")
 	}
 
-	var member models.BoardMember
-	err = datastore.GormDB.Where("board_id = ? AND user_id = ?", boardID, userID).First(&member).Error
+	var teamBoard models.TeamBoard
+	err = datastore.GormDB.Where("board_id = ?", boardID).First(&teamBoard).Error
 	if err != nil {
-		return errors.New("member not found")
+		return errors.New("team board not found")
 	}
 
-	member.CanGrantPermission = restrictions.CanGrantPermission
-	member.CanDelete = restrictions.CanDelete
-	member.CanEditMetadata = restrictions.CanEditMetadata
+	teamBoard.CanGrantPermission = restrictions.CanGrantPermission
+	teamBoard.CanDelete = restrictions.CanDelete
+	teamBoard.CanEditMetadata = restrictions.CanEditMetadata
 
-	return datastore.GormDB.Save(&member).Error
+	return datastore.GormDB.Save(&teamBoard).Error
 }
 
 func (s *TeamService) GetTeamMembersForUser(userID uint) ([]models.TeamMember, error) {

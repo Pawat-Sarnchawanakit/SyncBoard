@@ -629,6 +629,7 @@
     </div>
 
     <script>
+      feather.replace();
       let boardsData = [];
 
       function logout() {
@@ -932,7 +933,6 @@
 
       let boardsOffset = 0;
       let boardsLimit = 20;
-      let boardsTotal = 0;
       let isLoadingBoards = false;
 
       async function loadBoards(append = false) {
@@ -948,7 +948,6 @@
           const boardsGrid = document.getElementById("boardsGrid");
           const emptyState = document.getElementById("emptyState");
 
-          boardsTotal = data.total || 0;
           const newBoards = data.boards || [];
 
           if (!append) {
@@ -957,6 +956,8 @@
           } else {
             boardsData = [...boardsData, ...newBoards];
             boardsOffset += newBoards.length;
+            if(newBoards.length < boardsLimit)
+              document.removeEventListener("scroll", handleScroll);
           }
 
           if (response.ok && boardsData.length > 0) {
@@ -986,10 +987,6 @@
           } else if (!append && boardsData.length === 0) {
             boardsGrid.style.display = "none";
             emptyState.style.display = "block";
-          }
-
-          if (boardsOffset >= boardsTotal) {
-            document.removeEventListener("scroll", handleScroll);
           }
         } catch (err) {
           console.error("Failed to load boards:", err);
