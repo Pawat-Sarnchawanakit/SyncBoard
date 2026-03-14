@@ -69,6 +69,23 @@ type TeamBoardResponse struct {
 	CreatedAt      string `json:"createdAt"`
 }
 
+type CreateTeamResponse struct {
+	ID          uint      `json:"id"`
+	Title       string    `json:"title"`
+	Description string    `json:"description"`
+	Tags        string    `json:"tags"`
+	CreatedAt   time.Time `json:"createdAt"`
+}
+
+type TeamResponse struct {
+	ID          uint      `json:"id"`
+	Title       string    `json:"title"`
+	Description string    `json:"description"`
+	Tags        string    `json:"tags"`
+	OwnerID     uint      `json:"ownerId"`
+	CreatedAt   time.Time `json:"createdAt"`
+}
+
 func getUserID(app App, c *gin.Context) (uint, bool) {
 	token, err := c.Cookie("tk")
 	if err != nil {
@@ -100,12 +117,12 @@ func createTeamHandler(app App, c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"id":          team.ID,
-		"title":       team.Title,
-		"description": team.Description,
-		"tags":        team.Tags,
-		"createdAt":   team.CreatedAt,
+	c.JSON(http.StatusOK, CreateTeamResponse{
+		ID:          team.ID,
+		Title:       team.Title,
+		Description: team.Description,
+		Tags:        team.Tags,
+		CreatedAt:   team.CreatedAt,
 	})
 }
 
@@ -131,26 +148,26 @@ func getTeamsHandler(app App, c *gin.Context) {
 		return
 	}
 
-	var teamsWithRole []gin.H
-	teamMembers, _ := app.GetServices().TeamService.GetTeamMembersForUser(userID)
-	roleMap := make(map[uint]string)
-	for _, tm := range teamMembers {
-		roleMap[tm.TeamID] = tm.Role
+	type TeamDTO struct {
+		ID          uint      `json:"id"`
+		Title       string    `json:"title"`
+		Description string    `json:"description"`
+		Tags        string    `json:"tags"`
+		OwnerID     uint      `json:"ownerId"`
+		CreatedAt   time.Time `json:"createdAt"`
+		Role        string    `json:"role"`
 	}
 
+	var teamsWithRole []TeamDTO
 	for _, t := range teams {
-		role := roleMap[t.ID]
-		if role == "" {
-			role = "owner"
-		}
-		teamsWithRole = append(teamsWithRole, gin.H{
-			"id":          t.ID,
-			"title":       t.Title,
-			"description": t.Description,
-			"tags":        t.Tags,
-			"ownerId":     t.OwnerID,
-			"createdAt":   t.CreatedAt,
-			"role":        role,
+		teamsWithRole = append(teamsWithRole, TeamDTO{
+			ID:          t.ID,
+			Title:       t.Title,
+			Description: t.Description,
+			Tags:        t.Tags,
+			OwnerID:     t.OwnerID,
+			CreatedAt:   t.CreatedAt,
+			Role:        t.Role,
 		})
 	}
 
@@ -175,20 +192,14 @@ func getTeamHandler(app App, c *gin.Context) {
 		return
 	}
 
-	if !app.GetServices().TeamService.IsTeamMember(uint(teamID), userID) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "not a member of this team"})
-		return
-	}
-
-	team, err := app.GetServices().TeamService.GetTeam(uint(teamID))
+	team, err := app.GetServices().TeamService.UserRequestGetTeam(uint(teamID), userID)
 	if err != nil {
+		if err.Error() == "not a member of this team" {
+			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+			return
+		}
 		c.JSON(http.StatusNotFound, gin.H{"error": "team not found"})
 		return
-	}
-
-	role := "member"
-	if team.OwnerID == userID {
-		role = "owner"
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -198,7 +209,7 @@ func getTeamHandler(app App, c *gin.Context) {
 		"tags":        team.Tags,
 		"ownerId":     team.OwnerID,
 		"createdAt":   team.CreatedAt,
-		"role":        role,
+		"role":        team.Role,
 	})
 }
 
@@ -215,40 +226,39 @@ func updateTeamHandler(app App, c *gin.Context) {
 		return
 	}
 
-	if !app.GetServices().TeamService.IsTeamOwner(uint(teamID), userID) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "only owner can update team"})
-		return
-	}
-
 	var req UpdateTeamRequest
 	if err := c.BindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	input := teamsvc.UpdateTeamInput{}
+	var title, description, tags string
 	if req.Title != nil {
-		input.Title = req.Title
+		title = *req.Title
 	}
 	if req.Description != nil {
-		input.Description = req.Description
+		description = *req.Description
 	}
 	if req.Tags != nil {
-		input.Tags = req.Tags
+		tags = *req.Tags
 	}
 
-	team, err := app.GetServices().TeamService.UpdateTeam(uint(teamID), userID, input)
+	team, err := app.GetServices().TeamService.UserRequestUpdateTeam(uint(teamID), userID, title, description, tags)
 	if err != nil {
+		if err.Error() == "unauthorized to update team" {
+			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+			return
+		}
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"id":          team.ID,
-		"title":       team.Title,
-		"description": team.Description,
-		"tags":        team.Tags,
-		"createdAt":   team.CreatedAt,
+	c.JSON(http.StatusOK, TeamResponse{
+		ID:          team.ID,
+		Title:       team.Title,
+		Description: team.Description,
+		Tags:        team.Tags,
+		CreatedAt:   team.CreatedAt,
 	})
 }
 
@@ -265,7 +275,7 @@ func deleteTeamHandler(app App, c *gin.Context) {
 		return
 	}
 
-	err = app.GetServices().TeamService.DeleteTeam(uint(teamID), userID)
+	err = app.GetServices().TeamService.UserRequestDeleteTeam(uint(teamID), userID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -291,29 +301,28 @@ func addTeamTagsHandler(app App, c *gin.Context) {
 		return
 	}
 
-	if !app.GetServices().TeamService.IsTeamOwner(uint(teamID), userID) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "only owner can add tags"})
-		return
-	}
-
 	var req AddTagsRequest
 	if err := c.BindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	team, err := app.GetServices().TeamService.AddTags(uint(teamID), userID, req.Tags)
+	team, err := app.GetServices().TeamService.UserRequestAddTeamTags(uint(teamID), userID, req.Tags)
 	if err != nil {
+		if err.Error() == "unauthorized to add tags" {
+			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+			return
+		}
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"id":          team.ID,
-		"title":       team.Title,
-		"description": team.Description,
-		"tags":        team.Tags,
-		"createdAt":   team.CreatedAt,
+	c.JSON(http.StatusOK, TeamResponse{
+		ID:          team.ID,
+		Title:       team.Title,
+		Description: team.Description,
+		Tags:        team.Tags,
+		CreatedAt:   team.CreatedAt,
 	})
 }
 
@@ -330,11 +339,6 @@ func getTeamMembersHandler(app App, c *gin.Context) {
 		return
 	}
 
-	if !app.GetServices().TeamService.IsTeamMember(uint(teamID), userID) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "not a member of this team"})
-		return
-	}
-
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
 	if limit <= 0 || limit > 100 {
@@ -344,8 +348,12 @@ func getTeamMembersHandler(app App, c *gin.Context) {
 		offset = 0
 	}
 
-	members, total, err := app.GetServices().TeamService.GetTeamMembersPaginated(uint(teamID), offset, limit)
+	members, total, err := app.GetServices().TeamService.UserRequestGetTeamMembers(uint(teamID), userID, offset, limit)
 	if err != nil {
+		if err.Error() == "not a member of this team" {
+			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -387,28 +395,13 @@ func addTeamMemberHandler(app App, c *gin.Context) {
 		return
 	}
 
-	users, err := app.GetServices().AuthenticationService.SearchUsers(req.Username, 10)
+	targetUser, err := app.GetServices().AuthenticationService.GetUserByUsername(req.Username)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	var targetUserID uint
-	found := false
-	for _, u := range users {
-		if u.Username == req.Username {
-			targetUserID = u.ID
-			found = true
-			break
-		}
-	}
-
-	if !found {
 		c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
 		return
 	}
 
-	err = app.GetServices().TeamService.AddTeamMember(uint(teamID), userID, targetUserID)
+	err = app.GetServices().TeamService.AddTeamMember(uint(teamID), userID, targetUser.ID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -458,11 +451,6 @@ func getTeamBoardsHandler(app App, c *gin.Context) {
 		return
 	}
 
-	if !app.GetServices().TeamService.IsTeamMember(uint(teamID), userID) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "not a member of this team"})
-		return
-	}
-
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
 	if limit <= 0 || limit > 100 {
@@ -472,8 +460,12 @@ func getTeamBoardsHandler(app App, c *gin.Context) {
 		offset = 0
 	}
 
-	boards, err := app.GetServices().TeamService.GetTeamBoards(uint(teamID), offset, limit)
+	boards, err := app.GetServices().TeamService.UserRequestGetTeamBoards(uint(teamID), userID, offset, limit)
 	if err != nil {
+		if err.Error() == "not a member of this team" {
+			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -518,28 +510,13 @@ func createTeamBoardHandler(app App, c *gin.Context) {
 		return
 	}
 
-	teamMembers, err := app.GetServices().TeamService.GetTeamMembers(uint(teamID))
+	targetUser, err := app.GetServices().AuthenticationService.GetUserByUsername(req.MemberUsername)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	var targetUserID uint
-	found := false
-	for _, m := range teamMembers {
-		if m.Username == req.MemberUsername {
-			targetUserID = m.UserID
-			found = true
-			break
-		}
-	}
-
-	if !found {
 		c.JSON(http.StatusNotFound, gin.H{"error": "team member not found"})
 		return
 	}
 
-	board, err := app.GetServices().TeamService.CreateTeamBoard(uint(teamID), targetUserID, req.Title, req.Description, req.Tags, userID)
+	board, err := app.GetServices().TeamService.CreateTeamBoard(uint(teamID), targetUser.ID, req.Title, req.Description, req.Tags, userID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -575,19 +552,16 @@ func getTeamBoardMemberRestrictionsHandler(app App, c *gin.Context) {
 		return
 	}
 
-	board, err := app.GetServices().BoardService.GetBoard(uint(boardID))
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "board not found"})
-		return
-	}
-
-	if board.TeamID == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "not a team board"})
-		return
-	}
-
-	if !app.GetServices().TeamService.IsTeamOwner(board.TeamID, userID) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "only team owner can view restrictions"})
+	if err := app.GetServices().TeamService.UserCanViewTeamBoardRestrictions(uint(boardID), userID); err != nil {
+		if err.Error() == "board not found" {
+			c.JSON(http.StatusNotFound, gin.H{"error": "board not found"})
+			return
+		}
+		if err.Error() == "not a team board" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "not a team board"})
+			return
+		}
+		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -620,22 +594,6 @@ func updateTeamBoardMemberRestrictionsHandler(app App, c *gin.Context) {
 	memberUserID, err := strconv.ParseUint(c.Param("userId"), 10, 32)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user id"})
-		return
-	}
-
-	board, err := app.GetServices().BoardService.GetBoard(uint(boardID))
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "board not found"})
-		return
-	}
-
-	if board.TeamID == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "not a team board"})
-		return
-	}
-
-	if !app.GetServices().TeamService.IsTeamOwner(board.TeamID, userID) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "only team owner can update restrictions"})
 		return
 	}
 

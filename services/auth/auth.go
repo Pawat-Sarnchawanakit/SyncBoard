@@ -144,6 +144,15 @@ func (cur *AuthenticationService) GetUserByID(id uint) (*models.User, error) {
 	return &user, nil
 }
 
+func (cur *AuthenticationService) GetUserByUsername(username string) (*models.User, error) {
+	datastore := cur.app.GetDatastore()
+	user := models.User{}
+	if err := datastore.GormDB.Where("username = ?", username).First(&user).Error; err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
 func (cur *AuthenticationService) SearchUsers(query string, limit int) ([]models.User, error) {
 	datastore := cur.app.GetDatastore()
 	var users []models.User

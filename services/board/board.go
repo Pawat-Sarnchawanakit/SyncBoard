@@ -380,7 +380,7 @@ func joinTags(tags []string) string {
 	return strings.Join(tags, ",")
 }
 
-func (s *BoardService) CreateBoard(title, description, tags string, ownerID uint) (*models.Board, error) {
+func (s *BoardService) CreateBoard(title, description, tags string, ownerID uint) (*BoardInfo, error) {
 	if title == "" {
 		return nil, errors.New("title is required")
 	}
@@ -404,16 +404,50 @@ func (s *BoardService) CreateBoard(title, description, tags string, ownerID uint
 	if err := datastore.GormDB.Create(&board).Error; err != nil {
 		return nil, err
 	}
-	return &board, nil
+	return &BoardInfo{
+		ID:          board.ID,
+		Title:       board.Title,
+		Description: board.Description,
+		Tags:        board.Tags,
+		OwnerID:     board.OwnerID,
+		TeamID:      board.TeamID,
+		CreatedAt:   board.CreatedAt,
+	}, nil
 }
 
-type UpdateBoardInput struct {
-	Title       *string
-	Description *string
-	Tags        *string
+type BoardInfo struct {
+	ID          uint
+	Title       string
+	Description string
+	Tags        string
+	OwnerID     uint
+	TeamID      uint
+	CreatedAt   time.Time
 }
 
-func (s *BoardService) UpdateBoard(id uint, userID uint, input UpdateBoardInput) (*models.Board, error) {
+type BoardResponse struct {
+	ID          uint
+	Title       string
+	Description string
+	Tags        string
+	OwnerID     uint
+	TeamID      uint
+	CreatedAt   time.Time
+}
+
+func boardToResponse(board *models.Board) *BoardResponse {
+	return &BoardResponse{
+		ID:          board.ID,
+		Title:       board.Title,
+		Description: board.Description,
+		Tags:        board.Tags,
+		OwnerID:     board.OwnerID,
+		TeamID:      board.TeamID,
+		CreatedAt:   board.CreatedAt,
+	}
+}
+
+func (s *BoardService) UpdateBoard(id uint, userID uint, title, description, tags string) (*BoardInfo, error) {
 	datastore := s.app.GetDatastore()
 	board := models.Board{}
 	if err := datastore.GormDB.First(&board, id).Error; err != nil {
@@ -440,35 +474,40 @@ func (s *BoardService) UpdateBoard(id uint, userID uint, input UpdateBoardInput)
 		return nil, errors.New("unauthorized to edit board")
 	}
 
-	if input.Title != nil {
-		if *input.Title == "" {
-			return nil, errors.New("title is required")
-		}
-		if len(*input.Title) > 128 {
+	if title != "" {
+		if len(title) > 128 {
 			return nil, errors.New("title must be 128 characters or less")
 		}
-		board.Title = *input.Title
+		board.Title = title
 	}
-	if input.Description != nil {
-		if len(*input.Description) > 500 {
+	if description != "" {
+		if len(description) > 500 {
 			return nil, errors.New("description must be 500 characters or less")
 		}
-		board.Description = *input.Description
+		board.Description = description
 	}
-	if input.Tags != nil {
-		if len(*input.Tags) > 500 {
+	if tags != "" {
+		if len(tags) > 500 {
 			return nil, errors.New("tags must be 500 characters or less")
 		}
-		board.Tags = *input.Tags
+		board.Tags = tags
 	}
 
 	if err := datastore.GormDB.Save(&board).Error; err != nil {
 		return nil, err
 	}
-	return &board, nil
+	return &BoardInfo{
+		ID:          board.ID,
+		Title:       board.Title,
+		Description: board.Description,
+		Tags:        board.Tags,
+		OwnerID:     board.OwnerID,
+		TeamID:      board.TeamID,
+		CreatedAt:   board.CreatedAt,
+	}, nil
 }
 
-func (s *BoardService) AddTags(id uint, userID uint, newTags []string) (*models.Board, error) {
+func (s *BoardService) AddTags(id uint, userID uint, newTags []string) (*BoardInfo, error) {
 	if len(newTags) == 0 {
 		return nil, errors.New("at least one tag is required")
 	}
@@ -526,7 +565,15 @@ func (s *BoardService) AddTags(id uint, userID uint, newTags []string) (*models.
 	if err := datastore.GormDB.Save(&board).Error; err != nil {
 		return nil, err
 	}
-	return &board, nil
+	return &BoardInfo{
+		ID:          board.ID,
+		Title:       board.Title,
+		Description: board.Description,
+		Tags:        board.Tags,
+		OwnerID:     board.OwnerID,
+		TeamID:      board.TeamID,
+		CreatedAt:   board.CreatedAt,
+	}, nil
 }
 
 func (s *BoardService) DeleteBoard(id uint, userID uint) error {
@@ -566,6 +613,10 @@ func (s *BoardService) DeleteBoard(id uint, userID uint) error {
 	return nil
 }
 
+func (s *BoardService) UserRequestDeleteBoard(id uint, userID uint) error {
+	return s.DeleteBoard(id, userID)
+}
+
 func (s *BoardService) GetUserBoards(userID uint) ([]models.Board, error) {
 	datastore := s.app.GetDatastore()
 	var boards []models.Board
@@ -575,22 +626,38 @@ func (s *BoardService) GetUserBoards(userID uint) ([]models.Board, error) {
 	return boards, nil
 }
 
-func (s *BoardService) GetBoard(id uint) (*models.Board, error) {
+func (s *BoardService) GetBoard(id uint) (*BoardInfo, error) {
 	datastore := s.app.GetDatastore()
 	board := models.Board{}
 	if err := datastore.GormDB.First(&board, id).Error; err != nil {
 		return nil, err
 	}
-	return &board, nil
+	return &BoardInfo{
+		ID:          board.ID,
+		Title:       board.Title,
+		Description: board.Description,
+		Tags:        board.Tags,
+		OwnerID:     board.OwnerID,
+		TeamID:      board.TeamID,
+		CreatedAt:   board.CreatedAt,
+	}, nil
 }
 
-func (s *BoardService) GetBoardByIDAndOwner(id uint, ownerID uint) (*models.Board, error) {
+func (s *BoardService) GetBoardByIDAndOwner(id uint, ownerID uint) (*BoardInfo, error) {
 	datastore := s.app.GetDatastore()
 	board := models.Board{}
 	if err := datastore.GormDB.Where("id = ? AND owner_id = ?", id, ownerID).First(&board).Error; err != nil {
 		return nil, err
 	}
-	return &board, nil
+	return &BoardInfo{
+		ID:          board.ID,
+		Title:       board.Title,
+		Description: board.Description,
+		Tags:        board.Tags,
+		OwnerID:     board.OwnerID,
+		TeamID:      board.TeamID,
+		CreatedAt:   board.CreatedAt,
+	}, nil
 }
 
 func (s *BoardService) GetHub() *Hub {
@@ -744,14 +811,24 @@ func (s *BoardService) UserRequestUpdateMemberRole(boardID uint, requestUserID u
 
 func (s *BoardService) GetBoardMembers(boardID uint) ([]memberResponse, error) {
 	datastore := s.app.GetDatastore()
-	board, err := s.GetBoard(boardID)
-	if err != nil {
-		return nil, errors.New("board not found")
-	}
 
 	type memberWithUser struct {
 		models.BoardMember
 		Username string
+	}
+
+	type ownerWithUser struct {
+		OwnerID  uint
+		Username string
+	}
+
+	var ownerUser ownerWithUser
+	if err := datastore.GormDB.
+		Table("users").
+		Select("id as owner_id, username").
+		Where("id = (SELECT owner_id FROM boards WHERE id = ?)", boardID).
+		Scan(&ownerUser).Error; err != nil {
+		return nil, errors.New("board not found")
 	}
 
 	var boardMembersWithUsers []memberWithUser
@@ -762,13 +839,10 @@ func (s *BoardService) GetBoardMembers(boardID uint) ([]memberResponse, error) {
 		return nil, err
 	}
 
-	var ownerUser models.User
-	_ = datastore.GormDB.First(&ownerUser, board.OwnerID)
-
 	var members []memberResponse
 	members = append(members, memberResponse{
-		ID:       board.OwnerID,
-		UserID:   board.OwnerID,
+		ID:       ownerUser.OwnerID,
+		UserID:   ownerUser.OwnerID,
 		Username: ownerUser.Username,
 		Role:     models.RoleOwner,
 	})
@@ -787,8 +861,18 @@ func (s *BoardService) GetBoardMembers(boardID uint) ([]memberResponse, error) {
 
 func (s *BoardService) GetBoardMembersPaginated(boardID uint, offset, limit int) ([]memberResponse, int, error) {
 	datastore := s.app.GetDatastore()
-	board, err := s.GetBoard(boardID)
-	if err != nil {
+
+	type ownerWithUser struct {
+		OwnerID  uint
+		Username string
+	}
+
+	var ownerUser ownerWithUser
+	if err := datastore.GormDB.
+		Table("users").
+		Select("id as owner_id, username").
+		Where("id = (SELECT owner_id FROM boards WHERE id = ?)", boardID).
+		Scan(&ownerUser).Error; err != nil {
 		return nil, 0, errors.New("board not found")
 	}
 
@@ -814,15 +898,12 @@ func (s *BoardService) GetBoardMembersPaginated(boardID uint, offset, limit int)
 		return nil, 0, err
 	}
 
-	var ownerUser models.User
-	_ = datastore.GormDB.First(&ownerUser, board.OwnerID)
-
 	var members []memberResponse
 
 	if offset == 0 {
 		members = append(members, memberResponse{
-			ID:       board.OwnerID,
-			UserID:   board.OwnerID,
+			ID:       ownerUser.OwnerID,
+			UserID:   ownerUser.OwnerID,
 			Username: ownerUser.Username,
 			Role:     models.RoleOwner,
 		})
@@ -873,6 +954,59 @@ func (s *BoardService) GetUserPermission(boardID uint, userID uint) (string, err
 	return member.Role, nil
 }
 
+type boardTitleInfo struct {
+	Title       string
+	Description string
+	OwnerID     uint
+	TeamID      uint
+	Role        string
+}
+
+func (s *BoardService) GetBoardTitleAndPermission(boardID uint, userID uint) (string, string, error) {
+	datastore := s.app.GetDatastore()
+
+	type result struct {
+		BoardID       uint
+		Title         string
+		Description   string
+		OwnerID       uint
+		TeamID        uint
+		BoardOwnerID  uint
+		MemberRole    string
+		TeamBoardRole string
+	}
+
+	var results []result
+	err := datastore.GormDB.
+		Table("boards").
+		Select("boards.id as board_id, boards.title, boards.description, boards.owner_id, boards.team_id, board_members.role as member_role, team_boards.board_owner_id").
+		Joins("LEFT JOIN board_members ON boards.id = board_members.board_id AND board_members.user_id = ?", userID).
+		Joins("LEFT JOIN team_boards ON boards.id = team_boards.board_id").
+		Where("boards.id = ?", boardID).
+		Scan(&results).Error
+
+	if err != nil || len(results) == 0 {
+		return "", "", errors.New("board not found")
+	}
+
+	r := results[0]
+
+	role := ""
+	if r.OwnerID == userID {
+		role = models.RoleOwner
+	} else if r.TeamID != 0 && r.BoardOwnerID == userID {
+		role = models.RoleOwner
+	} else if r.MemberRole != "" {
+		role = r.MemberRole
+	}
+
+	if role == "" {
+		return "", "", errors.New("no access to this board")
+	}
+
+	return r.Title, role, nil
+}
+
 func (s *BoardService) HasViewAccess(boardID uint, userID uint) bool {
 	board, err := s.GetBoard(boardID)
 	if err != nil {
@@ -905,15 +1039,15 @@ func (s *BoardService) CanEdit(boardID uint, userID uint) bool {
 }
 
 type userBoardInfo struct {
-	Title            string
-	Description      string
-	Tags             string
-	ID               uint
-	OwnerID          uint
-	TeamBoardOwnerID uint
-	Role             string
-	TeamID           uint
-	CreatedAt        time.Time
+	Title            string    `json:"title"`
+	Description      string    `json:"description"`
+	Tags             string    `json:"tags"`
+	ID               uint      `json:"id"`
+	OwnerID          uint      `json:"ownerId"`
+	TeamBoardOwnerID uint      `json:"teamBoardOwnerId"`
+	Role             string    `json:"role"`
+	TeamID           uint      `json:"teamId"`
+	CreatedAt        time.Time `json:"createdAt"`
 }
 
 func (s *BoardService) GetUserBoardsWithAccess(userID uint, offset, limit int) ([]userBoardInfo, error) {
@@ -928,7 +1062,7 @@ func (s *BoardService) GetUserBoardsWithAccess(userID uint, offset, limit int) (
 		Where("boards.owner_id = ?", userID).
 		Or("board_members.user_id = ?", userID).
 		Or("team_boards.board_owner_id = ?", userID).
-		Scan(&boardInfos).Error; err != nil {
+		Find(&boardInfos).Error; err != nil {
 		return nil, err
 	}
 	return boardInfos, nil

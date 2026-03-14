@@ -53,23 +53,20 @@ func RegisterHandlers(app App) {
 			return
 		}
 
-		board, err := app.GetServices().BoardService.GetBoard(uint(boardID))
+		boardTitle, permission, err := app.GetServices().BoardService.GetBoardTitleAndPermission(uint(boardID), userID)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"message": err.Error(),
+			c.HTML(http.StatusBadRequest, "board.html", gin.H{
+				"Authenticated": true,
+				"BoardId":       c.Param("id"),
+				"Permission":    "",
 			})
 			return
-		}
-
-		permission, err := app.GetServices().BoardService.GetUserPermission(uint(boardID), userID)
-		if err != nil {
-			permission = ""
 		}
 
 		c.HTML(http.StatusOK, "board.html", gin.H{
 			"Authenticated": true,
 			"BoardId":       c.Param("id"),
-			"BoardTitle":    board.Title,
+			"BoardTitle":    boardTitle,
 			"Permission":    permission,
 		})
 	})

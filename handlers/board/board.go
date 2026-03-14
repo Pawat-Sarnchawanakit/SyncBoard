@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"sync-board/services"
 	boardsvc "sync-board/services/board"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
@@ -54,6 +55,23 @@ type MemberResponse struct {
 	UserID   uint   `json:"userId"`
 	Username string `json:"username"`
 	Role     string `json:"role"`
+}
+
+type BoardResponse struct {
+	ID          uint      `json:"id"`
+	Title       string    `json:"title"`
+	Description string    `json:"description"`
+	Tags        string    `json:"tags"`
+	OwnerID     uint      `json:"ownerId"`
+	CreatedAt   time.Time `json:"createdAt"`
+}
+
+type CreateBoardResponse struct {
+	ID          uint      `json:"id"`
+	Title       string    `json:"title"`
+	Description string    `json:"description"`
+	Tags        string    `json:"tags"`
+	CreatedAt   time.Time `json:"createdAt"`
 }
 
 type WsMessage struct {
@@ -116,12 +134,12 @@ func createBoardHandler(app App, c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"id":          board.ID,
-		"title":       board.Title,
-		"description": board.Description,
-		"tags":        board.Tags,
-		"createdAt":   board.CreatedAt,
+	c.JSON(http.StatusOK, CreateBoardResponse{
+		ID:          board.ID,
+		Title:       board.Title,
+		Description: board.Description,
+		Tags:        board.Tags,
+		CreatedAt:   board.CreatedAt,
 	})
 }
 
@@ -177,13 +195,13 @@ func getBoardHandler(app App, c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"id":          board.ID,
-		"title":       board.Title,
-		"description": board.Description,
-		"tags":        board.Tags,
-		"createdAt":   board.CreatedAt,
-		"ownerId":     board.OwnerID,
+	c.JSON(http.StatusOK, BoardResponse{
+		ID:          board.ID,
+		Title:       board.Title,
+		Description: board.Description,
+		Tags:        board.Tags,
+		OwnerID:     board.OwnerID,
+		CreatedAt:   board.CreatedAt,
 	})
 }
 
@@ -206,29 +224,29 @@ func updateBoardHandler(app App, c *gin.Context) {
 		return
 	}
 
-	input := boardsvc.UpdateBoardInput{}
+	var title, description, tags string
 	if req.Title != nil {
-		input.Title = req.Title
+		title = *req.Title
 	}
 	if req.Description != nil {
-		input.Description = req.Description
+		description = *req.Description
 	}
 	if req.Tags != nil {
-		input.Tags = req.Tags
+		tags = *req.Tags
 	}
 
-	board, err := app.GetServices().BoardService.UpdateBoard(uint(boardID), userID, input)
+	board, err := app.GetServices().BoardService.UpdateBoard(uint(boardID), userID, title, description, tags)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"id":          board.ID,
-		"title":       board.Title,
-		"description": board.Description,
-		"tags":        board.Tags,
-		"createdAt":   board.CreatedAt,
+	c.JSON(http.StatusOK, BoardResponse{
+		ID:          board.ID,
+		Title:       board.Title,
+		Description: board.Description,
+		Tags:        board.Tags,
+		CreatedAt:   board.CreatedAt,
 	})
 }
 
@@ -257,12 +275,12 @@ func addTagsHandler(app App, c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"id":          board.ID,
-		"title":       board.Title,
-		"description": board.Description,
-		"tags":        board.Tags,
-		"createdAt":   board.CreatedAt,
+	c.JSON(http.StatusOK, BoardResponse{
+		ID:          board.ID,
+		Title:       board.Title,
+		Description: board.Description,
+		Tags:        board.Tags,
+		CreatedAt:   board.CreatedAt,
 	})
 }
 
@@ -279,7 +297,7 @@ func deleteBoardHandler(app App, c *gin.Context) {
 		return
 	}
 
-	err = app.GetServices().BoardService.DeleteBoard(uint(boardID), userID)
+	err = app.GetServices().BoardService.UserRequestDeleteBoard(uint(boardID), userID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return

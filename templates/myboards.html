@@ -795,15 +795,15 @@
         });
 
       function showEditModal(boardId) {
-        const board = boardsData.find((b) => b.ID === boardId);
+        const board = boardsData.find((b) => b.id === boardId);
         if (!board) return;
 
         document.getElementById("editModal").classList.add("show");
         document.getElementById("editBoardId").value = boardId;
-        document.getElementById("editBoardTitle").value = board.Title || "";
+        document.getElementById("editBoardTitle").value = board.title || "";
         document.getElementById("editBoardDescription").value =
-          board.Description || "";
-        document.getElementById("editBoardTags").value = board.Tags || "";
+          board.description || "";
+        document.getElementById("editBoardTags").value = board.tags || "";
         document.getElementById("editTitleError").style.display = "none";
         document.getElementById("editSubmitBtn").disabled = false;
         document.getElementById("editSubmitBtn").textContent = "Save";
@@ -966,19 +966,19 @@
               boardsGrid.innerHTML = "";
             }
             newBoards.forEach(board => {
-              const tags = parseTags(board.Tags);
+              const tags = parseTags(board.tags);
               const clone = template.content.cloneNode(true);
-              clone.querySelector('.board-card-header h3').textContent = board.Title;
-              clone.querySelector('.board-card-header h3').setAttribute('onclick', `openBoard(${board.ID})`);
-              clone.querySelector('.action-btn').setAttribute('onclick', `event.stopPropagation(); showEditModal(${board.ID})`);
-              clone.querySelector('.action-btn.delete').setAttribute('onclick', `event.stopPropagation(); showDeleteModal(${board.ID})`);
-              if (board.Description) {
-                clone.querySelector('.board-description').textContent = board.Description;
+              clone.querySelector('.board-card-header h3').textContent = board.title;
+              clone.querySelector('.board-card-header h3').setAttribute('onclick', `openBoard(${board.id})`);
+              clone.querySelector('.action-btn').setAttribute('onclick', `event.stopPropagation(); showEditModal(${board.id})`);
+              clone.querySelector('.action-btn.delete').setAttribute('onclick', `event.stopPropagation(); showDeleteModal(${board.id})`);
+              if (board.description) {
+                clone.querySelector('.board-description').textContent = board.description;
               } else {
                 clone.querySelector('.board-description').style.display = 'none';
               }
-              clone.querySelector('.board-meta').textContent = 'Created: ' + new Date(board.CreatedAt).toLocaleDateString();
-              clone.querySelector('.tags-container').innerHTML = renderTags(tags, board.ID);
+              clone.querySelector('.board-meta').textContent = 'Created: ' + new Date(board.createdAt).toLocaleDateString();
+              clone.querySelector('.tags-container').innerHTML = renderTags(tags, board.id);
               boardsGrid.appendChild(clone);
             });
             boardsGrid.style.display = "grid";
