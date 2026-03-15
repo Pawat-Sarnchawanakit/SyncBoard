@@ -138,6 +138,7 @@ func RegisterHandlers(app App) {
 
 		c.HTML(http.StatusOK, "team.html", gin.H{
 			"TeamId":    c.Param("id"),
+			"UserId":    userID,
 			"TeamTitle": team.Title,
 			"Role":      role,
 		})

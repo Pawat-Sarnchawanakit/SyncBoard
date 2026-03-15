@@ -148,6 +148,19 @@
           </button>
         </div>
         <div id="teamBoardsList" class="boards-list"></div>
+
+      <template id="teamBoardItemTemplate">
+        <div class="board-item">
+          <div class="board-item-header">
+            <h4></h4>
+            <div class="board-item-actions"></div>
+          </div>
+          <span class="role-badge"></span>
+          <p class="board-description"></p>
+          <div class="meta"></div>
+          <div class="tags-container"></div>
+        </div>
+      </template>
       </div>
 
       <div class="tab-content" id="content-members">
@@ -228,13 +241,6 @@
             <input type="text" id="memberUsername" name="username" required placeholder="Search username..." autocomplete="off" oninput="searchTeamMembers(this.value)" />
             <div id="memberUserSuggestions" class="user-suggestions"></div>
             <p id="memberError" class="error-msg" style="display: none"></p>
-          </div>
-          <div class="form-group">
-            <label for="addMemberRole">Role</label>
-            <select id="addMemberRole">
-              <option value="member">Member</option>
-              <option value="admin">Admin</option>
-            </select>
           </div>
           <div class="modal-actions">
             <button type="button" onclick="hideAddMemberModal()" class="btn-cancel">Cancel</button>
@@ -380,6 +386,16 @@
               <span class="slider"></span>
             </label>
           </div>
+          <div class="restriction-item">
+            <div>
+              <div class="restriction-label">Can Draw</div>
+              <div class="restriction-desc">Allow this user to draw on the whiteboard</div>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="canDraw" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
           <div class="modal-actions" style="margin-top: 1.5rem;">
             <button type="button" onclick="hideRestrictionsModal()" class="btn-cancel">Cancel</button>
             <button type="submit" id="restrictionsSubmitBtn" class="btn-submit">Save</button>
@@ -388,8 +404,29 @@
       </div>
     </div>
 
+    <!-- Change Owner Modal -->
+    <div id="changeOwnerModal" class="modal">
+      <div class="modal-content">
+        <h3>Change Board Owner</h3>
+        <form id="changeOwnerForm">
+          <input type="hidden" id="changeOwnerBoardId" value="" />
+          <div class="form-group form-group-with-suggestions">
+            <label for="newOwnerUsername">New Owner Username *</label>
+            <input type="text" id="newOwnerUsername" name="username" required placeholder="Search username..." autocomplete="off" oninput="searchNewOwnerMembers(this.value)" />
+            <div id="newOwnerSuggestions" class="user-suggestions"></div>
+            <p id="newOwnerError" class="error-msg" style="display: none"></p>
+          </div>
+          <div class="modal-actions">
+            <button type="button" onclick="hideChangeOwnerModal()" class="btn-cancel">Cancel</button>
+            <button type="submit" id="changeOwnerSubmitBtn" class="btn-submit">Change Owner</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <script>
       const teamId = {{.TeamId}};
+      const currentUserId = {{.UserId}};
       const currentRole = "{{.Role}}";
       let teamData = {};
       let teamMembers = [];
@@ -619,6 +656,105 @@
         document.getElementById("restrictionsModal").classList.remove("show");
       }
 
+      function showChangeOwnerModal(boardId, currentOwnerId) {
+        document.getElementById("changeOwnerModal").classList.add("show");
+        document.getElementById("changeOwnerBoardId").value = boardId;
+        document.getElementById("newOwnerUsername").value = "";
+        document.getElementById("newOwnerError").style.display = "none";
+        document.getElementById("newOwnerSuggestions").classList.remove("show");
+        document.getElementById("changeOwnerSubmitBtn").disabled = false;
+        document.getElementById("changeOwnerSubmitBtn").textContent = "Change Owner";
+      }
+
+      function hideChangeOwnerModal() {
+        document.getElementById("changeOwnerModal").classList.remove("show");
+        document.getElementById("newOwnerSuggestions").classList.remove("show");
+      }
+
+      async function searchNewOwnerMembers(query) {
+        if (query.length < 1) {
+          document.getElementById('newOwnerSuggestions').classList.remove('show');
+          return;
+        }
+
+        try {
+          const response = await fetch('/api/teams/' + teamId + '/members/search?q=' + encodeURIComponent(query));
+          if (response.ok) {
+            const data = await response.json();
+            const suggestions = document.getElementById('newOwnerSuggestions');
+            const input = document.getElementById('newOwnerUsername');
+            if (data.users.length > 0) {
+              suggestions.innerHTML = '';
+              data.users.forEach(u => {
+                const el = document.createElement('div');
+                el.className = 'user-suggestion';
+                el.textContent = u.username;
+                el.dataset.userId = u.id;
+                el.dataset.username = u.username;
+                el.onclick = function() { selectNewOwnerMember(u.id, u.username); };
+                suggestions.appendChild(el);
+              });
+              
+              const rect = input.getBoundingClientRect();
+              suggestions.style.left = '1rem';
+              suggestions.style.right = '1rem';
+              suggestions.style.top = (input.offsetTop + input.offsetHeight) + 'px';
+              suggestions.classList.add('show');
+            } else {
+              suggestions.classList.remove('show');
+            }
+          }
+        } catch (err) {
+          console.error('Failed to search members:', err);
+        }
+      }
+
+      function selectNewOwnerMember(userId, username) {
+        document.getElementById('newOwnerUsername').value = username;
+        document.getElementById('newOwnerSuggestions').classList.remove('show');
+      }
+
+      document.getElementById("changeOwnerForm").addEventListener("submit", async function (e) {
+        e.preventDefault();
+        const boardId = document.getElementById("changeOwnerBoardId").value;
+        const newOwnerUsername = document.getElementById("newOwnerUsername").value.trim();
+        const errorEl = document.getElementById("newOwnerError");
+        const submitBtn = document.getElementById("changeOwnerSubmitBtn");
+
+        if (!newOwnerUsername) {
+          errorEl.textContent = "Please select a new owner";
+          errorEl.style.display = "block";
+          return;
+        }
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Changing...";
+
+        try {
+          const response = await fetch("/api/teams/" + teamId + "/boards/" + boardId + "/owner", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ newOwnerUsername }),
+          });
+          if (response.ok) {
+            hideChangeOwnerModal();
+            boardsOffset = 0;
+            loadTeamBoards();
+          } else {
+            const data = await response.json();
+            errorEl.textContent = data.error || "Failed to change owner";
+            errorEl.style.display = "block";
+            submitBtn.disabled = false;
+            submitBtn.textContent = "Change Owner";
+          }
+        } catch (err) {
+          errorEl.textContent = "An error occurred";
+          errorEl.style.display = "block";
+          submitBtn.disabled = false;
+          submitBtn.textContent = "Change Owner";
+        }
+      });
+
       // Form Handlers
       document.getElementById("editTeamForm").addEventListener("submit", async function (e) {
         e.preventDefault();
@@ -725,7 +861,6 @@
       document.getElementById("addMemberForm").addEventListener("submit", async function (e) {
         e.preventDefault();
         const username = document.getElementById("memberUsername").value.trim();
-        const role = document.getElementById("addMemberRole").value;
         const errorEl = document.getElementById("memberError");
         const submitBtn = document.getElementById("addMemberSubmitBtn");
 
@@ -742,7 +877,7 @@
           const response = await fetch("/api/teams/" + teamId + "/members", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ username, role }),
+            body: JSON.stringify({ username }),
           });
           const data = await response.json();
           if (response.ok) {
@@ -837,10 +972,9 @@
             body: JSON.stringify({ memberUsername, title, description, tags }),
           });
           const data = await response.json();
-          if (response.ok) {
+            if (response.ok) {
             hideCreateTeamBoardModal();
             loadTeamBoards();
-            window.location.href = "/board/" + data.id;
           } else {
             errorEl.textContent = data.error || "Failed to create board";
             errorEl.style.display = "block";
@@ -974,16 +1108,19 @@
         submitBtn.textContent = "Saving...";
 
         try {
-          const response = await fetch("/api/teams/" + teamId + "/boards/" + boardId + "/members/" + userId + "/restrictions", {
+          const response = await fetch("/api/teams/" + teamId + "/boards/" + boardId + "/owner-restrictions", {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               canGrantPermission: document.getElementById("canGrantPermission").checked,
               canDelete: document.getElementById("canDelete").checked,
               canEditMetadata: document.getElementById("canEditMetadata").checked,
+              canDraw: document.getElementById("canDraw").checked,
             }),
           });
           if (response.ok) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = "Save";
             hideRestrictionsModal();
           } else {
             const data = await response.json();
@@ -1000,12 +1137,13 @@
 
       async function loadRestrictions(boardId, userId) {
         try {
-          const response = await fetch("/api/teams/" + teamId + "/boards/" + boardId + "/members/" + userId + "/restrictions");
+          const response = await fetch("/api/teams/" + teamId + "/boards/" + boardId + "/owner-restrictions");
           if (response.ok) {
             const data = await response.json();
             document.getElementById("canGrantPermission").checked = data.canGrantPermission;
             document.getElementById("canDelete").checked = data.canDelete;
             document.getElementById("canEditMetadata").checked = data.canEditMetadata;
+            document.getElementById("canDraw").checked = data.canDraw;
           }
         } catch (err) {
           console.error("Failed to load restrictions:", err);
@@ -1077,7 +1215,8 @@
       async function loadTeamMembers(append = false) {
         if (isLoadingMembers || (append && !hasMoreMembers)) return;
         isLoadingMembers = true;
-
+        if(!append)
+          membersOffset = 0;
         try {
           const response = await fetch("/api/teams/" + teamId + "/members?offset=" + membersOffset + "&limit=" + membersLimit);
           const data = await response.json();
@@ -1106,7 +1245,7 @@
                     <div class="member-avatar">${initial}</div>
                     <div>
                       <div class="member-name">${escapeHtml(member.username)}</div>
-                      <div class="member-role">${member.role}</div>
+                      <div class="member-role" style="text-transform: capitalize;">${member.role}</div>
                     </div>
                   </div>
                   ${member.role !== "owner" && currentRole === "owner" ? `
@@ -1152,7 +1291,8 @@
       async function loadTeamBoards(append = false) {
         if (isLoadingBoards || (  append && !hasMoreBoards)) return;
         isLoadingBoards = true;
-
+        if(!append)
+          boardsOffset = 0;
         try {
           const response = await fetch("/api/teams/" + teamId + "/boards?offset=" + boardsOffset + "&limit=" + boardsLimit);
           const data = await response.json();
@@ -1172,41 +1312,96 @@
           }
 
           if (response.ok && newBoards.length > 0) {
-            let html = "";
-            newBoards.forEach(board => {
-              const isTeamOwner = board.ownerId === teamData.ownerId;
-              const boardRole = isTeamOwner ? "Team Owner" : (currentRole === "owner" ? "Owner" : "Member (Shared)");
-              
-              let actionsHtml = "";
-              if (currentRole === "owner") {
-                actionsHtml = `
-                  <div class="board-item-actions">
-                    <button class="action-btn" title="Edit" onclick="event.stopPropagation(); showEditBoardModal(${board.id})"><i data-feather="edit-3"></i></button>
-                    <button class="action-btn delete" title="Delete" onclick="event.stopPropagation(); showDeleteBoardModal(${board.id})"><i data-feather="trash-2"></i></button>
-                    <button class="action-btn" title="Permissions" onclick="event.stopPropagation(); showRestrictionsModal(${board.id}, ${board.ownerId})"><i data-feather="shield"></i></button>
-                  </div>
-                `;
-              }
-
-              html += `
-                <div class="board-item">
-                  <div class="board-item-header">
-                    <h4 onclick="window.location.href='/board/${board.id}'">${escapeHtml(board.title)}</h4>
-                    ${actionsHtml}
-                  </div>
-                  <span class="role-badge ${isTeamOwner ? 'owner' : 'shared'}">${boardRole}</span>
-                  ${board.description ? `<p>${escapeHtml(board.description)}</p>` : ""}
-                  <div class="meta">Owner: ${escapeHtml(board.ownerName || 'Unknown')} | Created: ${new Date(board.createdAt).toLocaleDateString()}</div>
-                  <div class="tags-container">${renderBoardTags(parseTags(board.tags), board.id, currentRole === "owner")}</div>
-                </div>
-              `;
-            });
-
-            if (append) {
-              boardsList.insertAdjacentHTML('beforeend', html);
-            } else {
-              boardsList.innerHTML = html;
+            const template = document.getElementById('teamBoardItemTemplate');
+            if (!append) {
+              boardsList.innerHTML = "";
             }
+            newBoards.forEach(board => {
+              const clone = template.content.cloneNode(true);
+              
+              const isTeamOwner = board.ownerId === currentUserId;
+              const isTeamBoardOwner = board.boardOwnerId === currentUserId;
+              const canEditMeta = (board.permissions & 4) !== 0;
+              const canDelete = (board.permissions & 2) !== 0;
+
+              clone.querySelector('h4').textContent = board.title;
+              clone.querySelector('h4').onclick = function() { window.location.href = '/board/' + board.id; };
+              if (isTeamOwner) {
+                const actionsDiv = clone.querySelector('.board-item-actions');
+                actionsDiv.innerHTML = '';
+                
+                const changeOwnerBtn = document.createElement('button');
+                changeOwnerBtn.className = 'action-btn';
+                changeOwnerBtn.title = 'Change Owner';
+                changeOwnerBtn.innerHTML = '<i data-feather="user"></i>';
+                changeOwnerBtn.onclick = function(event) { event.stopPropagation(); showChangeOwnerModal(board.id, board.boardOwnerId); };
+                actionsDiv.appendChild(changeOwnerBtn);
+                
+                const editBtn = document.createElement('button');
+                editBtn.className = 'action-btn';
+                editBtn.title = 'Edit';
+                editBtn.innerHTML = '<i data-feather="edit-3"></i>';
+                editBtn.onclick = function(event) { event.stopPropagation(); showEditBoardModal(board.id); };
+                actionsDiv.appendChild(editBtn);
+                
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'action-btn delete';
+                deleteBtn.title = 'Delete';
+                deleteBtn.innerHTML = '<i data-feather="trash-2"></i>';
+                deleteBtn.onclick = function(event) { event.stopPropagation(); showDeleteBoardModal(board.id); };
+                actionsDiv.appendChild(deleteBtn);
+                
+                const permBtn = document.createElement('button');
+                permBtn.className = 'action-btn';
+                permBtn.title = 'Permissions';
+                permBtn.innerHTML = '<i data-feather="shield"></i>';
+                permBtn.onclick = function(event) { event.stopPropagation(); showRestrictionsModal(board.id, board.boardOwnerId); };
+                actionsDiv.appendChild(permBtn);
+                
+                const roleBadge = clone.querySelector('.role-badge');
+                roleBadge.textContent = 'Team Owner';
+                roleBadge.classList.add('owner');
+              } else if (isTeamBoardOwner) {                
+                if (canEditMeta || canDelete) {
+                  const actionsDiv = clone.querySelector('.board-item-actions');
+                  actionsDiv.innerHTML = '';
+                  
+                  if (canEditMeta) {
+                    const editBtn = document.createElement('button');
+                    editBtn.className = 'action-btn';
+                    editBtn.title = 'Edit';
+                    editBtn.innerHTML = '<i data-feather="edit-3"></i>';
+                    editBtn.onclick = function(event) { event.stopPropagation(); showEditBoardModal(board.id); };
+                    actionsDiv.appendChild(editBtn);
+                  }
+                  if (canDelete) {
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.className = 'action-btn delete';
+                    deleteBtn.title = 'Delete';
+                    deleteBtn.innerHTML = '<i data-feather="trash-2"></i>';
+                    deleteBtn.onclick = function(event) { event.stopPropagation(); showDeleteBoardModal(board.id); };
+                    actionsDiv.appendChild(deleteBtn);
+                  }
+                }
+                
+                const roleBadge = clone.querySelector('.role-badge');
+                roleBadge.textContent = 'Owner';
+                roleBadge.classList.add('owner');
+              } else {
+                clone.querySelector('.role-badge').style.display = 'none';
+              }
+              
+              if (board.description) {
+                clone.querySelector('.board-description').textContent = board.description;
+              } else {
+                clone.querySelector('.board-description').style.display = 'none';
+              }
+              
+              clone.querySelector('.meta').textContent = 'Owner: ' + (board.ownerName || 'Unknown') + ' | Created: ' + new Date(board.createdAt).toLocaleDateString();
+              clone.querySelector('.tags-container').innerHTML = renderBoardTags(parseTags(board.tags), board.id, isTeamOwner || (isTeamBoardOwner && canEditMeta));
+              
+              boardsList.appendChild(clone);
+            });
             feather.replace();
           } else if (!append && newBoards.length === 0) {
             boardsList.innerHTML = '<div class="empty-state">No team boards yet</div>';

@@ -51,7 +51,6 @@ type UpdateMemberRequest struct {
 }
 
 type MemberResponse struct {
-	ID       uint   `json:"id"`
 	UserID   uint   `json:"userId"`
 	Username string `json:"username"`
 	Role     string `json:"role"`
@@ -159,14 +158,43 @@ func getBoardsHandler(app App, c *gin.Context) {
 		offset = 0
 	}
 
+	type UserBoardResponse struct {
+		Title            string    `json:"title"`
+		Description      string    `json:"description"`
+		Tags             string    `json:"tags"`
+		ID               uint      `json:"id"`
+		OwnerID          uint      `json:"ownerId"`
+		TeamBoardOwnerID uint      `json:"teamBoardOwnerId"`
+		Role             string    `json:"role"`
+		Permissions      uint8     `json:"permissions"`
+		TeamID           uint      `json:"teamId"`
+		CreatedAt        time.Time `json:"createdAt"`
+	}
+
 	boards, err := app.GetServices().BoardService.GetUserBoardsWithAccess(userID, offset, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
+	var response []UserBoardResponse
+	for _, b := range boards {
+		response = append(response, UserBoardResponse{
+			Title:            b.Title,
+			Description:      b.Description,
+			Tags:             b.Tags,
+			ID:               b.ID,
+			OwnerID:          b.OwnerID,
+			TeamBoardOwnerID: b.TeamBoardOwnerID,
+			Role:             b.Role,
+			Permissions:      b.Permissions,
+			TeamID:           b.TeamID,
+			CreatedAt:        b.CreatedAt,
+		})
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"boards": boards,
+		"boards": response,
 		"limit":  limit,
 	})
 }
@@ -511,7 +539,7 @@ func getBoardMembersHandler(app App, c *gin.Context) {
 		offset = 0
 	}
 
-	members, total, err := app.GetServices().BoardService.GetBoardMembersPaginated(uint(boardID), offset, limit)
+	members, err := app.GetServices().BoardService.GetBoardMembersPaginated(uint(boardID), offset, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -520,7 +548,6 @@ func getBoardMembersHandler(app App, c *gin.Context) {
 	var response []MemberResponse
 	for _, m := range members {
 		response = append(response, MemberResponse{
-			ID:       m.ID,
 			UserID:   m.UserID,
 			Username: m.Username,
 			Role:     m.Role,
@@ -529,7 +556,6 @@ func getBoardMembersHandler(app App, c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"members": response,
-		"total":   total,
 		"offset":  offset,
 		"limit":   limit,
 	})

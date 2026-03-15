@@ -1,6 +1,10 @@
 package models
 
-import "gorm.io/gorm"
+import (
+	"time"
+
+	"gorm.io/gorm"
+)
 
 type Board struct {
 	gorm.Model
@@ -19,8 +23,10 @@ const (
 )
 
 type BoardMember struct {
-	gorm.Model
-	BoardID uint   `gorm:"not null;index"`
-	UserID  uint   `gorm:"not null;index"`
+	BoardID uint   `gorm:"primaryKey"`
+	UserID  uint   `gorm:"primaryKey"`
 	Role    string `gorm:"size:20;not null;default:'viewer'"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	DeletedAt gorm.DeletedAt `gorm:"index"`
 }

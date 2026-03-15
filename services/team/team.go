@@ -531,6 +531,7 @@ type BoardRestrictions struct {
 	CanGrantPermission bool
 	CanDelete          bool
 	CanEditMetadata    bool
+	CanDraw            bool
 }
 
 func (s *TeamService) CreateTeamBoard(teamID uint, targetUserID uint, title, description, tags string, requestUserID uint) (*BoardInfo, error) {
@@ -572,23 +573,15 @@ func (s *TeamService) CreateTeamBoard(teamID uint, targetUserID uint, title, des
 	}
 
 	teamBoard := models.TeamBoard{
-		TeamID:             teamID,
-		BoardID:            board.ID,
-		BoardOwnerID:       targetUserID,
-		CanGrantPermission: true,
-		CanDelete:          false,
-		CanEditMetadata:    false,
+		TeamID:       teamID,
+		BoardID:      board.ID,
+		BoardOwnerID: targetUserID,
 	}
+	teamBoard.SetCanGrantPermission(true)
+	teamBoard.SetCanDelete(false)
+	teamBoard.SetCanEditMetadata(false)
+	teamBoard.SetCanDraw(true)
 	if err := datastore.GormDB.Create(&teamBoard).Error; err != nil {
-		return nil, err
-	}
-
-	member := models.BoardMember{
-		BoardID: board.ID,
-		UserID:  targetUserID,
-		Role:    models.RoleEditor,
-	}
-	if err := datastore.GormDB.Create(&member).Error; err != nil {
 		return nil, err
 	}
 
@@ -611,6 +604,7 @@ type TeamBoardWithOwner struct {
 	OwnerID      uint
 	OwnerName    string
 	BoardOwnerID uint
+	Permissions  uint8
 	CreatedAt    time.Time
 }
 
@@ -635,9 +629,11 @@ func (s *TeamService) GetTeamBoards(teamID uint, offset, limit int) ([]TeamBoard
 		Joins("JOIN boards ON boards.id = team_boards.board_id").
 		Joins("JOIN users ON team_boards.board_owner_id = users.id").
 		Where("team_boards.team_id = ?", teamID).
+		Where("boards.deleted_at IS NULL").
+		Where("users.deleted_at IS NULL").
 		Order("team_boards.created_at desc").
 		Offset(offset).Limit(limit).
-		Scan(&boardResults).Error; err != nil {
+		Find(&boardResults).Error; err != nil {
 		return nil, err
 	}
 
@@ -650,6 +646,7 @@ func (s *TeamService) GetTeamBoards(teamID uint, offset, limit int) ([]TeamBoard
 			Tags:         r.Tags,
 			OwnerID:      r.OwnerID,
 			OwnerName:    r.OwnerName,
+			Permissions:  r.Permissions,
 			BoardOwnerID: r.BoardOwnerID,
 			CreatedAt:    r.CreatedAt,
 		})
@@ -726,7 +723,7 @@ func (s *TeamService) GetUserTeams(userID uint, offset, limit int) ([]TeamWithRo
 	return result[offset:end], total, nil
 }
 
-func (s *TeamService) GetTeamBoardMemberRestrictions(boardID uint, userID uint) (*BoardRestrictions, error) {
+func (s *TeamService) GetTeamBoardOwnerRestrictions(boardID uint) (*BoardRestrictions, error) {
 	datastore := s.app.GetDatastore()
 	var teamBoard models.TeamBoard
 	err := datastore.GormDB.Where("board_id = ?", boardID).First(&teamBoard).Error
@@ -734,9 +731,10 @@ func (s *TeamService) GetTeamBoardMemberRestrictions(boardID uint, userID uint) 
 		return nil, errors.New("team board not found")
 	}
 	return &BoardRestrictions{
-		CanGrantPermission: teamBoard.CanGrantPermission,
-		CanDelete:          teamBoard.CanDelete,
-		CanEditMetadata:    teamBoard.CanEditMetadata,
+		CanGrantPermission: teamBoard.GetCanGrantPermission(),
+		CanDelete:          teamBoard.GetCanDelete(),
+		CanEditMetadata:    teamBoard.GetCanEditMetadata(),
+		CanDraw:            teamBoard.GetCanDraw(),
 	}, nil
 }
 
@@ -806,7 +804,7 @@ func (s *TeamService) UserCanUpdateTeamBoardRestrictions(boardID uint, requestUs
 	return nil
 }
 
-func (s *TeamService) UpdateTeamBoardMemberRestrictions(boardID uint, userID uint, requestUserID uint, restrictions BoardRestrictions) error {
+func (s *TeamService) UpdateTeamBoardOwnerRestrictions(boardID uint, requestUserID uint, restrictions BoardRestrictions) error {
 	if err := s.UserCanUpdateTeamBoardRestrictions(boardID, requestUserID); err != nil {
 		return err
 	}
@@ -819,11 +817,47 @@ func (s *TeamService) UpdateTeamBoardMemberRestrictions(boardID uint, userID uin
 		return errors.New("team board not found")
 	}
 
-	teamBoard.CanGrantPermission = restrictions.CanGrantPermission
-	teamBoard.CanDelete = restrictions.CanDelete
-	teamBoard.CanEditMetadata = restrictions.CanEditMetadata
+	teamBoard.SetCanGrantPermission(restrictions.CanGrantPermission)
+	teamBoard.SetCanDelete(restrictions.CanDelete)
+	teamBoard.SetCanEditMetadata(restrictions.CanEditMetadata)
+	teamBoard.SetCanDraw(restrictions.CanDraw)
 
 	return datastore.GormDB.Save(&teamBoard).Error
+}
+
+func (s *TeamService) ChangeTeamBoardOwner(teamID uint, boardID uint, newOwnerID uint, requestUserID uint) error {
+	team, err := s.GetTeam(teamID)
+	if err != nil {
+		return errors.New("team not found")
+	}
+
+	if team.OwnerID != requestUserID {
+		return errors.New("only team owner can change board owner")
+	}
+
+	if !s.IsTeamMember(teamID, newOwnerID) {
+		return errors.New("new owner must be a team member")
+	}
+
+	datastore := s.app.GetDatastore()
+
+	var board models.Board
+	if err := datastore.GormDB.Where("id = ? AND team_id = ?", boardID, teamID).First(&board).Error; err != nil {
+		return errors.New("board not found")
+	}
+
+	var teamBoard models.TeamBoard
+	if err := datastore.GormDB.Where("board_id = ?", boardID).First(&teamBoard).Error; err != nil {
+		return errors.New("team board not found")
+	}
+
+	teamBoard.BoardOwnerID = newOwnerID
+	if err := datastore.GormDB.Save(&teamBoard).Error; err != nil {
+		return err
+	}
+
+
+	return nil
 }
 
 func (s *TeamService) GetTeamMembersForUser(userID uint) ([]models.TeamMember, error) {

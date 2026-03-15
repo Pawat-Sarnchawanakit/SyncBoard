@@ -468,17 +468,10 @@
       <template id="boardCardTemplate">
         <div class="board-card">
           <div class="board-card-header">
-            <div class="board-card-badges"></div>
-            <div class="card-actions">
-              <button class="action-btn" title="Edit board">
-                <i data-feather="edit-3"></i>
-              </button>
-              <button class="action-btn delete" title="Delete board">
-                <i data-feather="trash-2"></i>
-              </button>
-            </div>
+            <h3></h3>
+            <div class="card-actions"></div>
           </div>
-          <h3></h3>
+          <div class="board-card-badges"></div>
           <p class="board-description"></p>
           <p class="board-meta"></p>
           <div class="tags-container"></div>
@@ -960,7 +953,8 @@
       async function loadBoards(append = false) {
         if (isLoadingBoards) return;
         isLoadingBoards = true;
-
+        if(!append)
+          boardsOffset = 0;
         try {
           const response = await fetch(
             "/api/boards?offset=" + boardsOffset + "&limit=" + boardsLimit,
@@ -1021,9 +1015,33 @@
               });
               
               clone.querySelector('h3').textContent = board.title;
-              clone.querySelector('h3').setAttribute('onclick', `openBoard(${board.id})`);
-              clone.querySelector('.action-btn').setAttribute('onclick', `event.stopPropagation(); showEditModal(${board.id})`);
-              clone.querySelector('.action-btn.delete').setAttribute('onclick', `event.stopPropagation(); showDeleteModal(${board.id})`);
+              clone.querySelector('h3').onclick = function() { openBoard(board.id); };
+              
+              const canEditMeta = (board.permissions & 4) !== 0;
+              const canDelete = (board.permissions & 2) !== 0;
+              const isBoardOwner = board.ownerId === currentUserId;
+              
+              const actionsDiv = clone.querySelector('.card-actions');
+              actionsDiv.innerHTML = '';
+              
+              if (isBoardOwner || (isTeamBoardOwner && (canEditMeta || canDelete))) {
+                if (isBoardOwner || canEditMeta) {
+                  const editBtn = document.createElement('button');
+                  editBtn.className = 'action-btn';
+                  editBtn.title = 'Edit board';
+                  editBtn.innerHTML = '<i data-feather="edit-3"></i>';
+                  editBtn.onclick = function(event) { event.stopPropagation(); showEditModal(board.id); };
+                  actionsDiv.appendChild(editBtn);
+                }
+                if (isBoardOwner || canDelete) {
+                  const deleteBtn = document.createElement('button');
+                  deleteBtn.className = 'action-btn delete';
+                  deleteBtn.title = 'Delete board';
+                  deleteBtn.innerHTML = '<i data-feather="trash-2"></i>';
+                  deleteBtn.onclick = function(event) { event.stopPropagation(); showDeleteModal(board.id); };
+                  actionsDiv.appendChild(deleteBtn);
+                }
+              }
               if (board.description) {
                 clone.querySelector('.board-description').textContent = board.description;
               } else {

@@ -47,6 +47,7 @@ type UpdateRestrictionsRequest struct {
 	CanGrantPermission *bool `json:"canGrantPermission"`
 	CanDelete          *bool `json:"canDelete"`
 	CanEditMetadata    *bool `json:"canEditMetadata"`
+	CanDraw            *bool `json:"canDraw"`
 }
 
 type MemberResponse struct {
@@ -65,7 +66,7 @@ type TeamBoardResponse struct {
 	OwnerName      string `json:"ownerName"`
 	TeamID         uint   `json:"teamId"`
 	BoardOwnerID   *uint  `json:"boardOwnerId,omitempty"`
-	BoardOwnerName string `json:"boardOwnerName,omitempty"`
+	Permissions    uint8  `json:"permissions"`
 	CreatedAt      string `json:"createdAt"`
 }
 
@@ -479,7 +480,9 @@ func getTeamBoardsHandler(app App, c *gin.Context) {
 			Tags:        b.Tags,
 			OwnerID:     b.OwnerID,
 			OwnerName:   b.OwnerName,
+			BoardOwnerID: &b.BoardOwnerID,
 			TeamID:      uint(teamID),
+			Permissions: b.Permissions,
 			CreatedAt:   b.CreatedAt.Format(time.RFC3339),
 		}
 		response = append(response, boardResp)
@@ -533,7 +536,7 @@ func createTeamBoardHandler(app App, c *gin.Context) {
 	})
 }
 
-func getTeamBoardMemberRestrictionsHandler(app App, c *gin.Context) {
+func getTeamBoardOwnerRestrictionsHandler(app App, c *gin.Context) {
 	userID, ok := getUserID(app, c)
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
@@ -543,12 +546,6 @@ func getTeamBoardMemberRestrictionsHandler(app App, c *gin.Context) {
 	boardID, err := strconv.ParseUint(c.Param("boardId"), 10, 32)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid board id"})
-		return
-	}
-
-	memberUserID, err := strconv.ParseUint(c.Param("userId"), 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user id"})
 		return
 	}
 
@@ -565,7 +562,7 @@ func getTeamBoardMemberRestrictionsHandler(app App, c *gin.Context) {
 		return
 	}
 
-	restrictions, err := app.GetServices().TeamService.GetTeamBoardMemberRestrictions(uint(boardID), uint(memberUserID))
+	restrictions, err := app.GetServices().TeamService.GetTeamBoardOwnerRestrictions(uint(boardID))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -575,10 +572,11 @@ func getTeamBoardMemberRestrictionsHandler(app App, c *gin.Context) {
 		"canGrantPermission": restrictions.CanGrantPermission,
 		"canDelete":          restrictions.CanDelete,
 		"canEditMetadata":    restrictions.CanEditMetadata,
+		"canDraw":            restrictions.CanDraw,
 	})
 }
 
-func updateTeamBoardMemberRestrictionsHandler(app App, c *gin.Context) {
+func updateTeamBoardOwnerRestrictionsHandler(app App, c *gin.Context) {
 	userID, ok := getUserID(app, c)
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
@@ -588,12 +586,6 @@ func updateTeamBoardMemberRestrictionsHandler(app App, c *gin.Context) {
 	boardID, err := strconv.ParseUint(c.Param("boardId"), 10, 32)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid board id"})
-		return
-	}
-
-	memberUserID, err := strconv.ParseUint(c.Param("userId"), 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user id"})
 		return
 	}
 
@@ -613,8 +605,11 @@ func updateTeamBoardMemberRestrictionsHandler(app App, c *gin.Context) {
 	if req.CanEditMetadata != nil {
 		restrictions.CanEditMetadata = *req.CanEditMetadata
 	}
+	if req.CanDraw != nil {
+		restrictions.CanDraw = *req.CanDraw
+	}
 
-	err = app.GetServices().TeamService.UpdateTeamBoardMemberRestrictions(uint(boardID), uint(memberUserID), userID, restrictions)
+	err = app.GetServices().TeamService.UpdateTeamBoardOwnerRestrictions(uint(boardID), userID, restrictions)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -623,6 +618,49 @@ func updateTeamBoardMemberRestrictionsHandler(app App, c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "restrictions updated"})
 }
 
+type ChangeTeamBoardOwnerRequest struct {
+	NewOwnerUsername string `json:"newOwnerUsername" binding:"required"`
+}
+
+func changeTeamBoardOwnerHandler(app App, c *gin.Context) {
+	userID, ok := getUserID(app, c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	teamID, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid team id"})
+		return
+	}
+
+	boardID, err := strconv.ParseUint(c.Param("boardId"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid board id"})
+		return
+	}
+
+	var req ChangeTeamBoardOwnerRequest
+	if err := c.BindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	newOwner, err := app.GetServices().AuthenticationService.GetUserByUsername(req.NewOwnerUsername)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+		return
+	}
+
+	err = app.GetServices().TeamService.ChangeTeamBoardOwner(uint(teamID), uint(boardID), newOwner.ID, userID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "owner changed"})
+}
 
 func searchTeamMembersHandler(app App, c *gin.Context) {
 	teamID, err := strconv.ParseUint(c.Param("id"), 10, 32)
@@ -656,7 +694,6 @@ func searchTeamMembersHandler(app App, c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"users": results})
 }
 
-
 func RegisterHandlers(app App) {
 	router := app.GetRouter()
 	router.POST("/api/teams", func(c *gin.Context) { createTeamHandler(app, c) })
@@ -671,6 +708,7 @@ func RegisterHandlers(app App) {
 	router.GET("/api/teams/:id/members/search", func(c *gin.Context) { searchTeamMembersHandler(app, c) })
 	router.GET("/api/teams/:id/boards", func(c *gin.Context) { getTeamBoardsHandler(app, c) })
 	router.POST("/api/teams/:id/boards", func(c *gin.Context) { createTeamBoardHandler(app, c) })
-	router.GET("/api/teams/:id/boards/:boardId/members/:userId/restrictions", func(c *gin.Context) { getTeamBoardMemberRestrictionsHandler(app, c) })
-	router.PATCH("/api/teams/:id/boards/:boardId/members/:userId/restrictions", func(c *gin.Context) { updateTeamBoardMemberRestrictionsHandler(app, c) })
+	router.GET("/api/teams/:id/boards/:boardId/owner-restrictions", func(c *gin.Context) { getTeamBoardOwnerRestrictionsHandler(app, c) })
+	router.PATCH("/api/teams/:id/boards/:boardId/owner-restrictions", func(c *gin.Context) { updateTeamBoardOwnerRestrictionsHandler(app, c) })
+	router.PATCH("/api/teams/:id/boards/:boardId/owner", func(c *gin.Context) { changeTeamBoardOwnerHandler(app, c) })
 }
