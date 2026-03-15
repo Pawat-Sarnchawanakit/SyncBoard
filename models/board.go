@@ -13,7 +13,7 @@ type Board struct {
 	Tags        string `gorm:"size:500"`
 	OwnerID     uint   `gorm:"not null"`
 	TeamID      uint   `gorm:"index"`
-	Content     []byte `gorm:"type:blob"`
+	Content     []byte
 }
 
 const (

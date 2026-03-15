@@ -58,16 +58,16 @@ type MemberResponse struct {
 }
 
 type TeamBoardResponse struct {
-	ID             uint   `json:"id"`
-	Title          string `json:"title"`
-	Description    string `json:"description"`
-	Tags           string `json:"tags"`
-	OwnerID        uint   `json:"ownerId"`
-	OwnerName      string `json:"ownerName"`
-	TeamID         uint   `json:"teamId"`
-	BoardOwnerID   *uint  `json:"boardOwnerId,omitempty"`
-	Permissions    uint8  `json:"permissions"`
-	CreatedAt      string `json:"createdAt"`
+	ID           uint   `json:"id"`
+	Title        string `json:"title"`
+	Description  string `json:"description"`
+	Tags         string `json:"tags"`
+	OwnerID      uint   `json:"ownerId"`
+	OwnerName    string `json:"ownerName"`
+	TeamID       uint   `json:"teamId"`
+	BoardOwnerID *uint  `json:"boardOwnerId,omitempty"`
+	Permissions  uint8  `json:"permissions"`
+	CreatedAt    string `json:"createdAt"`
 }
 
 type CreateTeamResponse struct {
@@ -136,6 +136,7 @@ func getTeamsHandler(app App, c *gin.Context) {
 
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	searchQuery := c.Query("q")
 	if limit <= 0 || limit > 100 {
 		limit = 20
 	}
@@ -143,7 +144,7 @@ func getTeamsHandler(app App, c *gin.Context) {
 		offset = 0
 	}
 
-	teams, total, err := app.GetServices().TeamService.GetUserTeams(userID, offset, limit)
+	teams, total, err := app.GetServices().TeamService.GetUserTeams(userID, searchQuery, offset, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -342,6 +343,7 @@ func getTeamMembersHandler(app App, c *gin.Context) {
 
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	searchQuery := c.Query("q")
 	if limit <= 0 || limit > 100 {
 		limit = 20
 	}
@@ -349,7 +351,7 @@ func getTeamMembersHandler(app App, c *gin.Context) {
 		offset = 0
 	}
 
-	members, total, err := app.GetServices().TeamService.UserRequestGetTeamMembers(uint(teamID), userID, offset, limit)
+	members, total, err := app.GetServices().TeamService.UserRequestGetTeamMembers(uint(teamID), userID, searchQuery, offset, limit)
 	if err != nil {
 		if err.Error() == "not a member of this team" {
 			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
@@ -454,6 +456,7 @@ func getTeamBoardsHandler(app App, c *gin.Context) {
 
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	searchQuery := c.Query("q")
 	if limit <= 0 || limit > 100 {
 		limit = 20
 	}
@@ -461,7 +464,7 @@ func getTeamBoardsHandler(app App, c *gin.Context) {
 		offset = 0
 	}
 
-	boards, err := app.GetServices().TeamService.UserRequestGetTeamBoards(uint(teamID), userID, offset, limit)
+	boards, err := app.GetServices().TeamService.UserRequestGetTeamBoards(uint(teamID), userID, searchQuery, offset, limit)
 	if err != nil {
 		if err.Error() == "not a member of this team" {
 			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
@@ -474,16 +477,16 @@ func getTeamBoardsHandler(app App, c *gin.Context) {
 	var response []TeamBoardResponse
 	for _, b := range boards {
 		boardResp := TeamBoardResponse{
-			ID:          b.BoardID,
-			Title:       b.Title,
-			Description: b.Description,
-			Tags:        b.Tags,
-			OwnerID:     b.OwnerID,
-			OwnerName:   b.OwnerName,
+			ID:           b.BoardID,
+			Title:        b.Title,
+			Description:  b.Description,
+			Tags:         b.Tags,
+			OwnerID:      b.OwnerID,
+			OwnerName:    b.OwnerName,
 			BoardOwnerID: &b.BoardOwnerID,
-			TeamID:      uint(teamID),
-			Permissions: b.Permissions,
-			CreatedAt:   b.CreatedAt.Format(time.RFC3339),
+			TeamID:       uint(teamID),
+			Permissions:  b.Permissions,
+			CreatedAt:    b.CreatedAt.Format(time.RFC3339),
 		}
 		response = append(response, boardResp)
 	}

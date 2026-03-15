@@ -7,7 +7,7 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
+	// "gorm.io/gorm/logger"
 )
 
 type DataStore struct {
@@ -37,7 +37,7 @@ func NewDataStore() (*DataStore, error) {
 	if err != nil {
 		return nil, err
 	}
-	db.Logger = db.Logger.LogMode(logger.Info)
+	// db.Logger = db.Logger.LogMode(logger.Info)
 	err = db.AutoMigrate(&User{}, &Board{}, &BoardMember{}, &Team{}, &TeamBoard{}, &TeamMember{})
 	if err != nil {
 		return nil, err

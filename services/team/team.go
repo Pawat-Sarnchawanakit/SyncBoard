@@ -380,7 +380,7 @@ func (s *TeamService) GetTeamMembers(teamID uint) ([]teamMemberResponse, error) 
 	return members, nil
 }
 
-func (s *TeamService) GetTeamMembersPaginated(teamID uint, offset, limit int) ([]teamMemberResponse, int, error) {
+func (s *TeamService) GetTeamMembersPaginated(teamID uint, searchQuery string, offset, limit int) ([]teamMemberResponse, int, error) {
 	datastore := s.app.GetDatastore()
 
 	type result struct {
@@ -390,13 +390,19 @@ func (s *TeamService) GetTeamMembersPaginated(teamID uint, offset, limit int) ([
 	}
 
 	var results []result
-	if err := datastore.GormDB.
+	query := datastore.GormDB.
 		Model(&models.TeamMember{}).
 		Select("COALESCE(team_members.user_id, teams.owner_id) as user_id, users.username, COALESCE(team_members.role, 'owner') as role").
 		Joins("JOIN users ON users.id = team_members.user_id AND team_members.team_id = ?", teamID).
 		Joins("JOIN teams ON teams.id = ?", teamID).
-		Where("users.id = teams.owner_id OR team_members.team_id = ?", teamID).
-		Find(&results).Error; err != nil {
+		Where("users.id = teams.owner_id OR team_members.team_id = ?", teamID)
+
+	if searchQuery != "" {
+		searchPattern := "%" + strings.ToUpper(searchQuery) + "%"
+		query = query.Where("UPPER(users.username) LIKE ?", searchPattern)
+	}
+
+	if err := query.Find(&results).Error; err != nil {
 		return nil, 0, err
 	}
 
@@ -424,7 +430,7 @@ func (s *TeamService) GetTeamMembersPaginated(teamID uint, offset, limit int) ([
 	return members, total, nil
 }
 
-func (s *TeamService) UserRequestGetTeamMembers(teamID uint, userID uint, offset, limit int) ([]teamMemberResponse, int, error) {
+func (s *TeamService) UserRequestGetTeamMembers(teamID uint, userID uint, searchQuery string, offset, limit int) ([]teamMemberResponse, int, error) {
 	team, err := s.GetTeam(teamID)
 	if err != nil {
 		return nil, 0, errors.New("team not found")
@@ -434,7 +440,7 @@ func (s *TeamService) UserRequestGetTeamMembers(teamID uint, userID uint, offset
 		return nil, 0, errors.New("not a member of this team")
 	}
 
-	return s.GetTeamMembersPaginated(teamID, offset, limit)
+	return s.GetTeamMembersPaginated(teamID, searchQuery, offset, limit)
 }
 
 func (s *TeamService) AddTeamMember(teamID uint, requestUserID uint, targetUserID uint) error {
@@ -608,7 +614,7 @@ type TeamBoardWithOwner struct {
 	CreatedAt    time.Time
 }
 
-func (s *TeamService) GetTeamBoards(teamID uint, offset, limit int) ([]TeamBoardWithOwner, error) {
+func (s *TeamService) GetTeamBoards(teamID uint, searchQuery string, offset, limit int) ([]TeamBoardWithOwner, error) {
 	datastore := s.app.GetDatastore()
 
 	type result struct {
@@ -623,17 +629,21 @@ func (s *TeamService) GetTeamBoards(teamID uint, offset, limit int) ([]TeamBoard
 	}
 
 	var boardResults []result
-	if err := datastore.GormDB.
+	query := datastore.GormDB.
 		Model(&models.TeamBoard{}).
 		Select("team_boards.*, boards.id as board_id, boards.title, boards.description, boards.tags, boards.owner_id, users.username as owner_name, boards.created_at").
 		Joins("JOIN boards ON boards.id = team_boards.board_id").
 		Joins("JOIN users ON team_boards.board_owner_id = users.id").
 		Where("team_boards.team_id = ?", teamID).
 		Where("boards.deleted_at IS NULL").
-		Where("users.deleted_at IS NULL").
-		Order("team_boards.created_at desc").
-		Offset(offset).Limit(limit).
-		Find(&boardResults).Error; err != nil {
+		Where("users.deleted_at IS NULL")
+
+	if searchQuery != "" {
+		searchPattern := "%" + strings.ToUpper(searchQuery) + "%"
+		query = query.Where("(UPPER(boards.title) LIKE ? OR UPPER(boards.description) LIKE ?)", searchPattern, searchPattern)
+	}
+
+	if err := query.Order("team_boards.created_at desc").Offset(offset).Limit(limit).Find(&boardResults).Error; err != nil {
 		return nil, err
 	}
 
@@ -655,7 +665,7 @@ func (s *TeamService) GetTeamBoards(teamID uint, offset, limit int) ([]TeamBoard
 	return results, nil
 }
 
-func (s *TeamService) UserRequestGetTeamBoards(teamID uint, userID uint, offset, limit int) ([]TeamBoardWithOwner, error) {
+func (s *TeamService) UserRequestGetTeamBoards(teamID uint, userID uint, searchQuery string, offset, limit int) ([]TeamBoardWithOwner, error) {
 	datastore := s.app.GetDatastore()
 
 	var exists bool
@@ -667,10 +677,10 @@ func (s *TeamService) UserRequestGetTeamBoards(teamID uint, userID uint, offset,
 		return nil, errors.New("not a member of this team or team not found")
 	}
 
-	return s.GetTeamBoards(teamID, offset, limit)
+	return s.GetTeamBoards(teamID, searchQuery, offset, limit)
 }
 
-func (s *TeamService) GetUserTeams(userID uint, offset, limit int) ([]TeamWithRole, int, error) {
+func (s *TeamService) GetUserTeams(userID uint, searchQuery string, offset, limit int) ([]TeamWithRole, int, error) {
 	datastore := s.app.GetDatastore()
 
 	type teamWithMember struct {
@@ -679,14 +689,19 @@ func (s *TeamService) GetUserTeams(userID uint, offset, limit int) ([]TeamWithRo
 	}
 
 	var teamsWithRole []teamWithMember
-	if err := datastore.GormDB.
+	query := datastore.GormDB.
 		Model(&models.Team{}).
 		Select("teams.*, team_members.role").
 		Joins("JOIN team_members ON teams.id = team_members.team_id").
 		Where("team_members.user_id = ?", userID).
-		Where("team_members.deleted_at IS NULL").
-		Order("teams.created_at desc").
-		Find(&teamsWithRole).Error; err != nil {
+		Where("team_members.deleted_at IS NULL")
+
+	if searchQuery != "" {
+		searchPattern := "%" + strings.ToUpper(searchQuery) + "%"
+		query = query.Where("(UPPER(teams.title) LIKE ? OR UPPER(teams.description) LIKE ? OR UPPER(teams.tags) LIKE ?)", searchPattern, searchPattern, searchPattern)
+	}
+
+	if err := query.Order("teams.created_at desc").Find(&teamsWithRole).Error; err != nil {
 		return nil, 0, err
 	}
 
@@ -855,7 +870,6 @@ func (s *TeamService) ChangeTeamBoardOwner(teamID uint, boardID uint, newOwnerID
 	if err := datastore.GormDB.Save(&teamBoard).Error; err != nil {
 		return err
 	}
-
 
 	return nil
 }

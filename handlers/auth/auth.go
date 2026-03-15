@@ -93,7 +93,7 @@ func searchUsersHandler(app App, c *gin.Context) {
 		ID       uint   `json:"id"`
 		Username string `json:"username"`
 	}
-	var results []userResult
+	results := make([]userResult, 0)
 	for _, u := range users {
 		results = append(results, userResult{ID: u.ID, Username: u.Username})
 	}

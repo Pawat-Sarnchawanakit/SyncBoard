@@ -965,8 +965,8 @@ func (s *BoardService) GetBoardTitleAndPermission(boardID uint, userID uint) (st
 	if r.OwnerID == userID {
 		role = models.RoleOwner
 	} else if r.TeamID != 0 && r.BoardOwnerID == userID {
-		if r.Permissions & models.PermCanDraw == 0 {
-			role = models.RoleViewer	
+		if r.Permissions&models.PermCanDraw == 0 {
+			role = models.RoleViewer
 		} else {
 			role = models.RoleOwner
 		}
@@ -1025,19 +1025,23 @@ type userBoardInfo struct {
 	CreatedAt        time.Time
 }
 
-func (s *BoardService) GetUserBoardsWithAccess(userID uint, offset, limit int) ([]userBoardInfo, error) {
+func (s *BoardService) GetUserBoardsWithAccess(userID uint, searchQuery string, offset, limit int) ([]userBoardInfo, error) {
 	datastore := s.app.GetDatastore()
 
 	var boardInfos []userBoardInfo
-	if err := datastore.GormDB.
+	query := datastore.GormDB.
 		Model(&models.Board{}).
 		Distinct("boards.title as title, boards.description as description, boards.tags as tags, boards.id as id, boards.owner_id as owner_id, team_boards.board_owner_id as team_board_owner_id, board_members.role as role, team_boards.team_id as team_id, boards.created_at as created_at, team_boards.permissions as permissions").
 		Joins("LEFT JOIN board_members ON boards.id = board_members.board_id").
 		Joins("LEFT JOIN team_boards on boards.id = team_boards.board_id").
-		Where("boards.owner_id = ?", userID).
-		Or("board_members.user_id = ?", userID).
-		Or("team_boards.board_owner_id = ?", userID).
-		Find(&boardInfos).Error; err != nil {
+		Where("boards.owner_id = ? OR board_members.user_id = ? OR team_boards.board_owner_id = ?", userID, userID, userID)
+
+	if searchQuery != "" {
+		searchPattern := "%" + strings.ToUpper(searchQuery) + "%"
+		query = query.Where("UPPER(boards.title) LIKE ? OR UPPER(boards.description) LIKE ? OR UPPER(boards.tags) LIKE ?", searchPattern, searchPattern, searchPattern)
+	}
+
+	if err := query.Find(&boardInfos).Error; err != nil {
 		return nil, err
 	}
 	return boardInfos, nil

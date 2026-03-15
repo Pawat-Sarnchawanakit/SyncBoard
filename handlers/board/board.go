@@ -151,6 +151,7 @@ func getBoardsHandler(app App, c *gin.Context) {
 
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	searchQuery := c.Query("q")
 	if limit <= 0 || limit > 100 {
 		limit = 20
 	}
@@ -171,7 +172,7 @@ func getBoardsHandler(app App, c *gin.Context) {
 		CreatedAt        time.Time `json:"createdAt"`
 	}
 
-	boards, err := app.GetServices().BoardService.GetUserBoardsWithAccess(userID, offset, limit)
+	boards, err := app.GetServices().BoardService.GetUserBoardsWithAccess(userID, searchQuery, offset, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

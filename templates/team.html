@@ -45,6 +45,9 @@
       .tab-content.active { display: block; }
       .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
       .section-header h3 { font-size: 1.3rem; color: #333; }
+      .section-header-left { display: flex; align-items: center; gap: 1rem; }
+      .search-input { width: 250px; padding: 0.5rem 0.75rem; border: 1px solid #ddd; border-radius: 6px; font-size: 0.875rem; transition: border-color 0.3s ease, box-shadow 0.3s ease; }
+      .search-input:focus { outline: none; border-color: #007bff; box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25); }
       .create-btn { background-color: #007bff; color: white; border: none; padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.875rem; transition: background-color 0.3s ease; display: flex; align-items: center; gap: 0.25rem; }
       .create-btn:hover { background-color: #0056b3; }
       .members-list { background: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); overflow: hidden; }
@@ -142,7 +145,10 @@
 
       <div class="tab-content active" id="content-boards">
         <div class="section-header">
-          <h3>Team Boards</h3>
+          <div class="section-header-left">
+            <h3>Team Boards</h3>
+            <input type="text" id="teamBoardSearch" class="search-input" placeholder="Search boards..." />
+          </div>
           <button onclick="showCreateTeamBoardModal()" class="create-btn" id="createBoardBtn" style="display: none;">
             <i data-feather="plus" style="width:14px;height:14px;"></i> Create Team Board
           </button>
@@ -165,7 +171,10 @@
 
       <div class="tab-content" id="content-members">
         <div class="section-header">
-          <h3>Team Members</h3>
+          <div class="section-header-left">
+            <h3>Team Members</h3>
+            <input type="text" id="teamMemberSearch" class="search-input" placeholder="Search members..." />
+          </div>
           <button onclick="showAddMemberModal()" class="create-btn" id="addMemberBtn" style="display: none;">
             <i data-feather="user-plus" style="width:14px;height:14px;"></i> Add Member
           </button>
@@ -435,13 +444,39 @@
       const membersLimit = 20;
       let isLoadingMembers = false;
       let hasMoreMembers = true;
+      let memberSearchQuery = "";
       let boardsOffset = 0;
       const boardsLimit = 20;
       let isLoadingBoards = false;
       let hasMoreBoards = true;
+      let boardSearchQuery = "";
       let activeTab = 'boards';
       let selectedMemberUserId = null;
       let selectedBoardMemberUserId = null;
+      let boardSearchTimeout = null;
+      let memberSearchTimeout = null;
+
+      function debounceBoards(func, wait) {
+        return function executedFunction(...args) {
+          const later = () => {
+            clearTimeout(boardSearchTimeout);
+            func(...args);
+          };
+          clearTimeout(boardSearchTimeout);
+          boardSearchTimeout = setTimeout(later, wait);
+        };
+      }
+
+      function debounceMembers(func, wait) {
+        return function executedFunction(...args) {
+          const later = () => {
+            clearTimeout(memberSearchTimeout);
+            func(...args);
+          };
+          clearTimeout(memberSearchTimeout);
+          memberSearchTimeout = setTimeout(later, wait);
+        };
+      }
 
       function logout() {
         fetch("/api/logout", { method: "POST" }).then((x) => (window.location.href = "/"));
@@ -1218,7 +1253,11 @@
         if(!append)
           membersOffset = 0;
         try {
-          const response = await fetch("/api/teams/" + teamId + "/members?offset=" + membersOffset + "&limit=" + membersLimit);
+          let url = "/api/teams/" + teamId + "/members?offset=" + membersOffset + "&limit=" + membersLimit;
+          if (memberSearchQuery) {
+            url += "&q=" + encodeURIComponent(memberSearchQuery);
+          }
+          const response = await fetch(url);
           const data = await response.json();
           const membersList = document.getElementById("membersList");
           const newMembers = data.members || [];
@@ -1294,7 +1333,11 @@
         if(!append)
           boardsOffset = 0;
         try {
-          const response = await fetch("/api/teams/" + teamId + "/boards?offset=" + boardsOffset + "&limit=" + boardsLimit);
+          let url = "/api/teams/" + teamId + "/boards?offset=" + boardsOffset + "&limit=" + boardsLimit;
+          if (boardSearchQuery) {
+            url += "&q=" + encodeURIComponent(boardSearchQuery);
+          }
+          const response = await fetch(url);
           const data = await response.json();
           const boardsList = document.getElementById("teamBoardsList");
           const newBoards = data.boards || [];
@@ -1423,6 +1466,28 @@
         loadTeamMembers();
         loadTeamBoards();
         document.addEventListener("scroll", handleScroll);
+
+        const debouncedBoardSearch = debounceBoards(function(query) {
+          boardSearchQuery = query;
+          boardsOffset = 0;
+          hasMoreBoards = true;
+          loadTeamBoards();
+        }, 250);
+
+        const debouncedMemberSearch = debounceMembers(function(query) {
+          memberSearchQuery = query;
+          membersOffset = 0;
+          hasMoreMembers = true;
+          loadTeamMembers();
+        }, 250);
+
+        document.getElementById("teamBoardSearch").addEventListener("input", function(e) {
+          debouncedBoardSearch(e.target.value.trim());
+        });
+
+        document.getElementById("teamMemberSearch").addEventListener("input", function(e) {
+          debouncedMemberSearch(e.target.value.trim());
+        });
       });
     </script>
   </body>

@@ -22,6 +22,9 @@ func RegisterHandlers(app App) {
 			"Authenticated": auth.IsAuthenticated(app, c),
 		})
 	})
+	router.GET("/favicon.ico", func(c *gin.Context) {
+		c.File("assets/favicon.ico")
+	})
 	router.GET("/myboards", func(c *gin.Context) {
 		if !auth.IsAuthenticated(app, c) {
 			c.Redirect(http.StatusTemporaryRedirect, "/login")

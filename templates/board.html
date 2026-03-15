@@ -1150,7 +1150,7 @@
       ctx.globalCompositeOperation = 'source-over';
       ctx.strokeStyle = msg.color;
       ctx.fillStyle = msg.color;
-      ctx.lineWidth = msg.size;
+      ctx.lineWidth = msg.size * (msg.tool == "eraser" ? 4 : 1);
       
       ctx.beginPath();
       ctx.moveTo(msg.x1, msg.y1);

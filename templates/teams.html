@@ -21,6 +21,9 @@
       .main-content { max-width: 1200px; margin: 0 auto; padding: 2rem; }
       .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
       .page-header h2 { font-size: 1.8rem; color: #333; }
+      .search-container { margin-bottom: 1.5rem; }
+      .search-input { width: 100%; max-width: 400px; padding: 0.7rem 1rem; border: 1px solid #ddd; border-radius: 6px; font-size: 1rem; transition: border-color 0.3s ease, box-shadow 0.3s ease; }
+      .search-input:focus { outline: none; border-color: #007bff; box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25); }
       .create-team-btn { background-color: #007bff; color: white; border: none; padding: 0.7rem 1.5rem; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 1rem; transition: background-color 0.3s ease; }
       .create-team-btn:hover { background-color: #0056b3; }
       .teams-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1.5rem; }
@@ -96,6 +99,10 @@
         <button onclick="showCreateModal()" class="create-team-btn">
           <i data-feather="plus" style="width:16px;height:16px;vertical-align:middle;margin-right:4px;"></i> Create New Team
         </button>
+      </div>
+
+      <div class="search-container">
+        <input type="text" id="teamSearch" class="search-input" placeholder="Search teams..." />
       </div>
 
       <div id="teamsGrid" class="teams-grid"></div>
@@ -208,6 +215,18 @@
     <script>
       feather.replace();
       let teamsData = [];
+      let teamSearchTimeout = null;
+
+      function debounce(func, wait) {
+        return function executedFunction(...args) {
+          const later = () => {
+            clearTimeout(teamSearchTimeout);
+            func(...args);
+          };
+          clearTimeout(teamSearchTimeout);
+          teamSearchTimeout = setTimeout(later, wait);
+        };
+      }
 
       function logout() {
         fetch("/api/logout", { method: "POST" }).then((x) => (window.location.href = "/"));
@@ -461,13 +480,18 @@
       let teamsLimit = 20;
       let teamsTotal = 0;
       let isLoadingTeams = false;
+      let teamSearchQuery = "";
 
       async function loadTeams(append = false) {
         if (isLoadingTeams) return;
         isLoadingTeams = true;
 
         try {
-          const response = await fetch("/api/teams?offset=" + teamsOffset + "&limit=" + teamsLimit);
+          let url = "/api/teams?offset=" + teamsOffset + "&limit=" + teamsLimit;
+          if (teamSearchQuery) {
+            url += "&q=" + encodeURIComponent(teamSearchQuery);
+          }
+          const response = await fetch(url);
           const data = await response.json();
 
           const teamsGrid = document.getElementById("teamsGrid");
@@ -550,6 +574,17 @@
         div.textContent = text;
         return div.innerHTML;
       }
+
+      const debouncedTeamSearch = debounce(function(query) {
+        teamSearchQuery = query;
+        teamsOffset = 0;
+        document.addEventListener("scroll", handleScroll);
+        loadTeams();
+      }, 250);
+
+      document.getElementById("teamSearch").addEventListener("input", function(e) {
+        debouncedTeamSearch(e.target.value.trim());
+      });
 
       document.addEventListener("DOMContentLoaded", function () {
         loadTeams();

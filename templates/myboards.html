@@ -102,6 +102,26 @@
         color: #333;
       }
 
+      .search-container {
+        margin-bottom: 1.5rem;
+      }
+
+      .search-input {
+        width: 100%;
+        max-width: 400px;
+        padding: 0.7rem 1rem;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        font-size: 1rem;
+        transition: border-color 0.3s ease, box-shadow 0.3s ease;
+      }
+
+      .search-input:focus {
+        outline: none;
+        border-color: #007bff;
+        box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+      }
+
       .create-board-btn {
         background-color: #007bff;
         color: white;
@@ -463,6 +483,10 @@
         </button>
       </div>
 
+      <div class="search-container">
+        <input type="text" id="boardSearch" class="search-input" placeholder="Search boards..." />
+      </div>
+
       <div id="boardsGrid" class="boards-grid"></div>
 
       <template id="boardCardTemplate">
@@ -646,6 +670,18 @@
       feather.replace();
       const currentUserId = {{.UserID}};
       let boardsData = [];
+      let boardSearchTimeout = null;
+
+      function debounce(func, wait) {
+        return function executedFunction(...args) {
+          const later = () => {
+            clearTimeout(boardSearchTimeout);
+            func(...args);
+          };
+          clearTimeout(boardSearchTimeout);
+          boardSearchTimeout = setTimeout(later, wait);
+        };
+      }
 
       function logout() {
         fetch("/api/logout", {
@@ -949,6 +985,7 @@
       let boardsOffset = 0;
       let boardsLimit = 20;
       let isLoadingBoards = false;
+      let boardSearchQuery = "";
 
       async function loadBoards(append = false) {
         if (isLoadingBoards) return;
@@ -956,9 +993,11 @@
         if(!append)
           boardsOffset = 0;
         try {
-          const response = await fetch(
-            "/api/boards?offset=" + boardsOffset + "&limit=" + boardsLimit,
-          );
+          let url = "/api/boards?offset=" + boardsOffset + "&limit=" + boardsLimit;
+          if (boardSearchQuery) {
+            url += "&q=" + encodeURIComponent(boardSearchQuery);
+          }
+          const response = await fetch(url);
           const data = await response.json();
 
           const boardsGrid = document.getElementById("boardsGrid");
@@ -1084,6 +1123,17 @@
       function openBoard(id) {
         window.location.href = "/board/" + id;
       }
+
+      const debouncedSearch = debounce(function(query) {
+        boardSearchQuery = query;
+        boardsOffset = 0;
+        document.addEventListener("scroll", handleScroll);
+        loadBoards();
+      }, 250);
+
+      document.getElementById("boardSearch").addEventListener("input", function(e) {
+        debouncedSearch(e.target.value.trim());
+      });
 
       document.addEventListener("DOMContentLoaded", function () {
         loadBoards();

@@ -15,10 +15,7 @@ import (
 // Board page (view/edit boards)
 
 func main() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal(err)
-	}
+	_ = godotenv.Load()
 	app, err := app.NewApp()
 	if err != nil {
 		log.Fatal(err)
